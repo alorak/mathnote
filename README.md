@@ -140,6 +140,18 @@ Bu kontrol, build çıktısında uzak script/style/module bağlantısı kalmadı
 
 ---
 
+## PWA ve çevrimdışı kullanım
+
+GitHub Pages sürümü installable PWA olarak yayınlanır. Manifest, uygulama ikonları ve service worker build sırasında `dist/` içine dahil edilir.
+
+- `start_url` ve `scope` relative (`./`) tutulduğu için proje `/mathnote/` gibi GitHub Pages alt yollarında çalışır.
+- İlk başarılı ziyarette uygulama shell'i, JavaScript/CSS, KaTeX fontları, manifest ve ikonlar precache edilir.
+- Yeni build'de dosya içeriğinden yeni bir cache sürümü üretilir; service worker aktive olduğunda eski MathNote cache'leri temizlenir.
+- Service worker yalnızca HTTP/HTTPS üzerinde kaydolur. Bu nedenle `dist/index.html` dosyasını doğrudan `file://` ile açma desteği korunur.
+- Destekleyen tarayıcılar MathNote'u masaüstüne veya ana ekrana bağımsız uygulama olarak kurabilir.
+
+---
+
 ## GitHub Pages
 
 Repo, GitHub Pages üzerinde kaynak `index.html` dosyasını doğrudan yayınlamak yerine GitHub Actions ile build edilir. `.github/workflows/pages.yml` workflow'u:
