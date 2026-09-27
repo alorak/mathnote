@@ -140,6 +140,22 @@ Bu kontrol, build çıktısında uzak script/style/module bağlantısı kalmadı
 
 ---
 
+## GitHub Pages
+
+Repo, GitHub Pages üzerinde kaynak `index.html` dosyasını doğrudan yayınlamak yerine GitHub Actions ile build edilir. `.github/workflows/pages.yml` workflow'u:
+
+1. npm bağımlılıklarını kurar.
+2. `npm run build` ile `dist/` çıktısını üretir.
+3. Offline doğrulamasını çalıştırır.
+4. `dist/` klasörünü GitHub Pages artifact'i olarak yükler.
+5. `main` branch'ine yapılan push/merge sonrasında artifact'i yayınlar.
+
+GitHub üzerinde bir kez **Settings → Pages → Build and deployment → Source → GitHub Actions** seçilmelidir. Bundan sonra her `main` güncellemesi otomatik olarak `https://alorak.github.io/mathnote/` adresine deploy edilir.
+
+PR'larda workflow yalnızca build ve doğrulama yapar; canlı deploy yalnızca `main` üzerinde gerçekleşir.
+
+---
+
 ## Lisans
 
 MIT Lisansı

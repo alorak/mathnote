@@ -40,4 +40,5 @@ if (html.includes('MATHNOTE_BUILD_')) {
 }
 
 await writeFile(new URL('../dist/index.html', import.meta.url), html, 'utf8');
+await writeFile(new URL('../dist/.nojekyll', import.meta.url), '', 'utf8');
 console.log('MathNote offline bundle written to dist/.');
