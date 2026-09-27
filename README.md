@@ -1,6 +1,6 @@
 # mathnote
 
-Tek bir HTML dosyasından oluşan, tarayıcı tabanlı interaktif matematik defteri. Kurulum gerektirmez; doğrudan tarayıcıda açılır.
+Tarayıcı tabanlı interaktif matematik defteri. Uygulama bağımlılıkları npm üzerinden sabitlenir ve esbuild ile internet bağlantısı gerektirmeyen taşınabilir bir `dist/` çıktısına dönüştürülür.
 
 ---
 
@@ -91,18 +91,28 @@ Sağ üstteki **EN / TR** geçişiyle arayüz dili değiştirilebilir. Tercih `l
 
 ## Kullanım
 
-```bash
-# Kurulum gerektirmez.
-# index.html dosyasını herhangi bir tarayıcıda açın:
-open index.html
-```
-
-veya bir yerel HTTP sunucusu kullanın (isteğe bağlı, ESM import map için):
+### Offline dağıtım oluşturma
 
 ```bash
-python3 -m http.server 8080
-# → http://localhost:8080
+npm install
+npm run build
 ```
+
+Build sonrasında `dist/` klasörü tüm çalışma zamanı bağımlılıklarını, KaTeX stillerini ve fontlarını yerel olarak içerir:
+
+```bash
+open dist/index.html
+```
+
+`dist/index.html` klasik IIFE bundle kullandığı için yerel bir HTTP sunucusu gerektirmeden `file://` üzerinden açılabilir. Build alındıktan sonra matematik motoru, editör, grafik ve formül render katmanı için internet bağlantısı gerekmez.
+
+Offline bağımlılık kontrolünü çalıştırmak için:
+
+```bash
+npm run test:offline
+```
+
+Bu kontrol, build çıktısında uzak script/style/module bağlantısı kalmadığını ve KaTeX fontlarının yerel çıktıya kopyalandığını doğrular.
 
 ---
 
@@ -115,17 +125,18 @@ python3 -m http.server 8080
 
 ---
 
-## Bağımlılıklar (CDN)
+## Bağımlılıklar
 
-Tüm bağımlılıklar CDN üzerinden yüklenir; yerel kurulum gerekmez.
+Çalışma zamanı bağımlılıkları CDN'den yüklenmez. npm paketleri sabit sürümlere pinlenir ve esbuild ile `dist/app.js` / `dist/app.css` içine bundle edilir. KaTeX fontları da `dist/assets/` altına kopyalanır.
 
 | Kütüphane | Sürüm | Amaç |
 |-----------|-------|------|
-| [KaTeX](https://katex.org) | 0.16.21 | LaTeX render |
-| [math.js](https://mathjs.org) | 14 | Sayısal hesaplama & birimler |
-| [Nerdamer](https://nerdamer.com) | 1 | Sembolik cebir |
-| [function-plot](https://mauriciopoppe.github.io/function-plot/) | 1 | 2D grafik |
-| [CodeMirror](https://codemirror.net) | 6 | Kod editörü |
+| KaTeX | 0.16.21 | LaTeX render |
+| math.js | 14.9.1 | Sayısal hesaplama & birimler |
+| Nerdamer | 1.1.13 | Sembolik cebir |
+| function-plot | 1.25.4 | 2D grafik |
+| CodeMirror | 6.x (pinli paketler) | Kod editörü |
+| esbuild | 0.28.2 | Offline browser bundle |
 
 ---
 
