@@ -792,19 +792,30 @@ function applyBackup(backup) {
   const prefs = backup.preferences;
   if (prefs.language && translations[prefs.language]) {
     currentLang = prefs.language;
-    localStorage.setItem(LANG_KEY, currentLang);
-  }
-  if (typeof prefs.zoom === 'string' && /^\d+$/.test(prefs.zoom)) {
-    localStorage.setItem('mathnotebook_zoom', prefs.zoom);
-  }
-  if (typeof prefs.sidebarWidth === 'string' && /^\d+(?:\.\d+)?$/.test(prefs.sidebarWidth)) {
-    localStorage.setItem('mathnotebook_sidebar_width', prefs.sidebarWidth);
   }
 
   saveNow();
   renderTabs();
   replaceEditorContent(files[activeIdx].content);
   setLanguage(currentLang);
+
+  if (typeof prefs.zoom === 'string' && /^\d+$/.test(prefs.zoom)) {
+    const restoredZoom = parseInt(prefs.zoom, 10);
+    if (Number.isFinite(restoredZoom)) {
+      zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, restoredZoom));
+      applyZoom();
+    }
+  }
+
+  if (typeof prefs.sidebarWidth === 'string' && /^\d+(?:\.\d+)?$/.test(prefs.sidebarWidth)) {
+    const restoredWidth = parseFloat(prefs.sidebarWidth);
+    const maxWidth = Math.floor(document.body.clientWidth / 2);
+    if (Number.isFinite(restoredWidth) && maxWidth > 150) {
+      const width = Math.max(151, Math.min(restoredWidth, maxWidth - 1));
+      sidebar.style.width = width + 'px';
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+    }
+  }
 
   document.getElementById('backup-modal').classList.remove('active');
   alert(t('backupRestored'));
