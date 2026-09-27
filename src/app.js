@@ -33,6 +33,10 @@ const translations = {
     equations: 'equations',
     zoomIn: 'Zoom in (Ctrl++)',
     zoomOut: 'Zoom out (Ctrl+-)',
+    online: 'Online',
+    offline: 'Offline',
+    onlineTitle: 'Network connection available',
+    offlineTitle: 'Offline — MathNote continues from local cache',
     
     // Alerts
     atLeastOneFile: 'At least one file must remain open.',
@@ -143,6 +147,21 @@ const translations = {
     exportConfirm: 'Export',
     exportPdfHint: '(browser print)',
 
+    // Backup / restore
+    backupBtn: 'Backup',
+    backupTitle: 'Backup & Restore',
+    backupDesc: 'Back up or restore all notebooks in one JSON file.',
+    backupExportTitle: 'Download backup',
+    backupExportDesc: 'Save all notebooks and basic preferences as JSON.',
+    backupImportTitle: 'Restore backup',
+    backupImportDesc: 'Replace current notebooks from a MathNote JSON backup.',
+    backupClose: 'Close',
+    backupFileName: 'mathnote-backup',
+    backupInvalid: 'This file is not a valid MathNote backup.',
+    backupReadError: 'The backup file could not be read.',
+    backupConfirmRestore: 'Restore this backup? Current notebooks will be replaced.',
+    backupRestored: 'Backup restored successfully.',
+
     // Info modal
     infoBtn: 'Info',
     infoTitle: 'About MathNote',
@@ -203,6 +222,10 @@ const translations = {
     equations: 'denklem',
     zoomIn: 'Büyüt (Ctrl++)',
     zoomOut: 'Küçült (Ctrl+-)',
+    online: 'Çevrimiçi',
+    offline: 'Çevrimdışı',
+    onlineTitle: 'Ağ bağlantısı kullanılabilir',
+    offlineTitle: 'Çevrimdışı — MathNote yerel önbellekten çalışmaya devam eder',
     
     // Alerts
     atLeastOneFile: 'En az bir dosya açık kalmalı.',
@@ -313,6 +336,21 @@ const translations = {
     exportConfirm: 'Dışa Aktar',
     exportPdfHint: '(tarayıcı yazdır)',
 
+    // Yedek / geri yükleme
+    backupBtn: 'Yedek',
+    backupTitle: 'Yedekle & Geri Yükle',
+    backupDesc: 'Tüm not defterlerini tek bir JSON dosyasıyla yedekleyin veya geri yükleyin.',
+    backupExportTitle: 'Yedeği indir',
+    backupExportDesc: 'Tüm not defterlerini ve temel tercihleri JSON olarak kaydedin.',
+    backupImportTitle: 'Yedeği geri yükle',
+    backupImportDesc: 'Mevcut not defterlerini bir MathNote JSON yedeğiyle değiştirin.',
+    backupClose: 'Kapat',
+    backupFileName: 'mathnote-yedek',
+    backupInvalid: 'Bu dosya geçerli bir MathNote yedeği değil.',
+    backupReadError: 'Yedek dosyası okunamadı.',
+    backupConfirmRestore: 'Bu yedek geri yüklensin mi? Mevcut not defterleri değiştirilecek.',
+    backupRestored: 'Yedek başarıyla geri yüklendi.',
+
     // Info modal
     infoBtn: 'Bilgi',
     infoTitle: 'MathNote Hakkında',
@@ -393,6 +431,18 @@ function updateUILanguage() {
   document.getElementById('export-cancel').textContent = t('exportCancel');
   document.getElementById('export-confirm').textContent = t('exportConfirm');
   document.getElementById('export-pdf-label').innerHTML = `PDF <small>${t('exportPdfHint')}</small>`;
+
+  // Update backup / restore UI
+  document.getElementById('backup-btn').textContent = t('backupBtn');
+  document.getElementById('backup-btn').title = t('backupTitle');
+  document.getElementById('backup-modal-title').textContent = t('backupTitle');
+  document.getElementById('backup-modal-desc').textContent = t('backupDesc');
+  document.getElementById('backup-export-title').textContent = t('backupExportTitle');
+  document.getElementById('backup-export-desc').textContent = t('backupExportDesc');
+  document.getElementById('backup-import-title').textContent = t('backupImportTitle');
+  document.getElementById('backup-import-desc').textContent = t('backupImportDesc');
+  document.getElementById('backup-close').textContent = t('backupClose');
+  updateConnectivityStatus();
 
   // Update insert modal
   document.getElementById('insert-modal-title').textContent = t('insertTitle');
@@ -522,9 +572,33 @@ let files = loadFiles();
 let activeIdx = 0;
 let view = null;
 
-function save() {
+const SAVE_DEBOUNCE_MS = 300;
+let saveTimer = null;
+
+function saveNow() {
+  if (saveTimer !== null) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
 }
+
+function scheduleSave() {
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = null;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+  }, SAVE_DEBOUNCE_MS);
+}
+
+function flushPendingSave() {
+  if (saveTimer !== null) saveNow();
+}
+
+window.addEventListener('pagehide', flushPendingSave);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPendingSave();
+});
 
 function esc(s) {
   return String(s)
@@ -565,7 +639,7 @@ function renderTabs() {
 function switchTo(idx) {
   if (view) {
     files[activeIdx].content = view.state.doc.toString();
-    save();
+    saveNow();
   }
   activeIdx = idx;
   renderTabs();
@@ -590,7 +664,7 @@ function confirmNewFile() {
   if (name) {
     files.push({ name, content: pendingNewFileContent });
     pendingNewFileContent = '';
-    save();
+    saveNow();
     switchTo(files.length - 1);
   }
   document.getElementById('new-file-modal').classList.remove('active');
@@ -640,6 +714,157 @@ function downloadBlob(content, filename, mime) {
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+
+// ── Connectivity status ────────────────────────────────────────────────────────
+function updateConnectivityStatus() {
+  const status = document.getElementById('connection-status');
+  const label = document.getElementById('connection-status-text');
+  if (!status || !label) return;
+
+  const online = navigator.onLine;
+  status.classList.toggle('offline', !online);
+  status.title = t(online ? 'onlineTitle' : 'offlineTitle');
+  label.textContent = t(online ? 'online' : 'offline');
+}
+
+window.addEventListener('online', updateConnectivityStatus);
+window.addEventListener('offline', updateConnectivityStatus);
+updateConnectivityStatus();
+
+// ── Full backup / restore ─────────────────────────────────────────────────────
+const BACKUP_FORMAT = 'mathnote-backup';
+const BACKUP_VERSION = 1;
+
+function createBackupPayload() {
+  if (view && files[activeIdx]) {
+    files[activeIdx].content = view.state.doc.toString();
+  }
+  saveNow();
+
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    files: files.map(file => ({ name: file.name, content: file.content })),
+    activeIndex: activeIdx,
+    preferences: {
+      language: currentLang,
+      zoom: localStorage.getItem('mathnotebook_zoom'),
+      sidebarWidth: localStorage.getItem('mathnotebook_sidebar_width')
+    }
+  };
+}
+
+function exportFullBackup() {
+  const payload = createBackupPayload();
+  const date = payload.exportedAt.slice(0, 10);
+  const filename = `${t('backupFileName')}-${date}.json`;
+  downloadBlob(JSON.stringify(payload, null, 2), filename, 'application/json;charset=utf-8');
+  document.getElementById('backup-modal').classList.remove('active');
+}
+
+function normalizeBackup(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (raw.format !== BACKUP_FORMAT || raw.version !== BACKUP_VERSION) return null;
+  if (!Array.isArray(raw.files) || raw.files.length === 0) return null;
+
+  const restoredFiles = [];
+  for (const file of raw.files) {
+    if (!file || typeof file !== 'object') return null;
+    if (typeof file.name !== 'string' || typeof file.content !== 'string') return null;
+    const name = file.name.trim();
+    if (!name || name.length > 255) return null;
+    restoredFiles.push({ name, content: file.content });
+  }
+
+  const requestedIndex = Number.isInteger(raw.activeIndex) ? raw.activeIndex : 0;
+  return {
+    files: restoredFiles,
+    activeIndex: Math.max(0, Math.min(requestedIndex, restoredFiles.length - 1)),
+    preferences: raw.preferences && typeof raw.preferences === 'object' ? raw.preferences : {}
+  };
+}
+
+function applyBackup(backup) {
+  files = backup.files;
+  activeIdx = backup.activeIndex;
+
+  const prefs = backup.preferences;
+  if (prefs.language && translations[prefs.language]) {
+    currentLang = prefs.language;
+  }
+
+  saveNow();
+  renderTabs();
+  replaceEditorContent(files[activeIdx].content);
+  setLanguage(currentLang);
+
+  if (typeof prefs.zoom === 'string' && /^\d+$/.test(prefs.zoom)) {
+    const restoredZoom = parseInt(prefs.zoom, 10);
+    if (Number.isFinite(restoredZoom)) {
+      zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, restoredZoom));
+      applyZoom();
+    }
+  }
+
+  if (typeof prefs.sidebarWidth === 'string' && /^\d+(?:\.\d+)?$/.test(prefs.sidebarWidth)) {
+    const restoredWidth = parseFloat(prefs.sidebarWidth);
+    const maxWidth = Math.floor(document.body.clientWidth / 2);
+    if (Number.isFinite(restoredWidth) && maxWidth > 150) {
+      const width = Math.max(151, Math.min(restoredWidth, maxWidth - 1));
+      sidebar.style.width = width + 'px';
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+    }
+  }
+
+  document.getElementById('backup-modal').classList.remove('active');
+  alert(t('backupRestored'));
+}
+
+function importFullBackup(file) {
+  const reader = new FileReader();
+  reader.addEventListener('load', () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || ''));
+      const backup = normalizeBackup(parsed);
+      if (!backup) {
+        alert(t('backupInvalid'));
+        return;
+      }
+      if (!confirm(t('backupConfirmRestore'))) return;
+      applyBackup(backup);
+    } catch {
+      alert(t('backupInvalid'));
+    } finally {
+      document.getElementById('backup-file-input').value = '';
+    }
+  });
+  reader.addEventListener('error', () => {
+    alert(t('backupReadError'));
+    document.getElementById('backup-file-input').value = '';
+  });
+  reader.readAsText(file);
+}
+
+document.getElementById('backup-btn').addEventListener('click', () => {
+  document.getElementById('backup-modal').classList.add('active');
+});
+document.getElementById('backup-close').addEventListener('click', () => {
+  document.getElementById('backup-modal').classList.remove('active');
+});
+document.getElementById('backup-modal').addEventListener('click', event => {
+  if (event.target === document.getElementById('backup-modal')) {
+    document.getElementById('backup-modal').classList.remove('active');
+  }
+});
+document.getElementById('backup-export-btn').addEventListener('click', exportFullBackup);
+document.getElementById('backup-import-btn').addEventListener('click', () => {
+  document.getElementById('backup-file-input').click();
+});
+document.getElementById('backup-file-input').addEventListener('change', event => {
+  const [file] = event.target.files || [];
+  if (file) importFullBackup(file);
+});
 
 function editorContentToMarkdown(raw) {
   const lines = raw.split('\n');
@@ -743,7 +968,7 @@ function closeFile(idx) {
   if (!confirm(`"${files[idx].name}" ${t('confirmDelete')}`)) return;
   files.splice(idx, 1);
   activeIdx = Math.min(activeIdx, files.length - 1);
-  save();
+  saveNow();
   renderTabs();
   replaceEditorContent(files[activeIdx].content);
 }
@@ -4329,7 +4554,7 @@ function initEditor(initialContent) {
 
         const content = upd.state.doc.toString();
         files[activeIdx].content = content;
-        save();
+        scheduleSave();
 
         const result = evalAll(content);
         renderSidebar(result.vars, result.funcs, result.plots);

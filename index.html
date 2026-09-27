@@ -66,7 +66,7 @@ body {
   border-radius: 6px;
   padding: 2px;
 }
-#export-btn, #info-btn {
+#export-btn, #backup-btn, #info-btn {
   padding: 4px 10px;
   border: 1px solid #ced4da;
   background: #fff;
@@ -82,7 +82,7 @@ body {
   gap: 4px;
   white-space: nowrap;
 }
-#export-btn:hover, #info-btn:hover {
+#export-btn:hover, #backup-btn:hover, #info-btn:hover {
   background: #f1f3f5;
   border-color: #1A71C2;
   color: #1A71C2;
@@ -312,6 +312,33 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+#connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 58px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #495057;
+  font-weight: 600;
+  white-space: nowrap;
+}
+#connection-status .connection-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #40c057;
+  box-shadow: 0 0 0 2px rgba(64,192,87,0.12);
+}
+#connection-status.offline {
+  color: #c92a2a;
+  background: #fff5f5;
+}
+#connection-status.offline .connection-dot {
+  background: #fa5252;
+  box-shadow: 0 0 0 2px rgba(250,82,82,0.12);
 }
 .zoom-btn {
   display: inline-flex;
@@ -816,6 +843,54 @@ body {
 }
 #modal-confirm:hover, #export-confirm:hover { background: #1864ab; }
 
+.backup-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6c757d;
+  margin: -2px 0 14px;
+}
+.backup-option {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  margin: 0 0 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #fff;
+  color: #343a40;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.backup-option:hover {
+  border-color: #74c0fc;
+  background: #f8fbff;
+}
+.backup-option strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.backup-option span {
+  display: block;
+  font-size: 11px;
+  color: #868e96;
+  line-height: 1.4;
+}
+.backup-option-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1.2;
+}
+#backup-close {
+  background: #f1f3f5;
+  color: #495057;
+}
+#backup-close:hover { background: #e9ecef; }
+
 /* ── Insert FAB ────────────────────────────────────────────── */
 #editor-pane { position: relative; }
 #insert-fab {
@@ -893,6 +968,7 @@ body {
   <span id="app-logo">mathnote</span>
   <div id="topbar-right">
     <button id="info-btn" title="Information / Bilgi">Info</button>
+    <button id="backup-btn" title="Backup / Restore">Backup</button>
     <button id="export-btn">&#8593; Export</button>
     <div id="lang-switcher">
       <button class="lang-btn" data-lang="en">EN</button>
@@ -918,6 +994,11 @@ body {
         <span class="status-item" id="st-eqs">0 denklem</span>
       </div>
       <div id="statusbar-right">
+        <span id="connection-status" role="status" aria-live="polite">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="connection-status-text">Online</span>
+        </span>
+        <span class="status-sep"></span>
         <button class="zoom-btn" id="zoom-out" title="Küçült (Ctrl+-)">&minus;</button>
         <span id="zoom-level">100%</span>
         <button class="zoom-btn" id="zoom-in" title="Büyüt (Ctrl++)">&plus;</button>
@@ -965,6 +1046,31 @@ body {
     <div class="modal-actions">
       <button id="export-cancel">İptal</button>
       <button id="export-confirm">Export</button>
+    </div>
+  </div>
+</div>
+
+<div id="backup-modal" class="modal-overlay">
+  <div class="modal" style="width:380px;max-width:92vw">
+    <div class="modal-title" id="backup-modal-title">Backup & Restore</div>
+    <div class="backup-desc" id="backup-modal-desc">Back up or restore all notebooks in one JSON file.</div>
+    <button class="backup-option" id="backup-export-btn" type="button">
+      <span class="backup-option-icon" aria-hidden="true">↓</span>
+      <span>
+        <strong id="backup-export-title">Download backup</strong>
+        <span id="backup-export-desc">Save all notebooks and basic preferences as JSON.</span>
+      </span>
+    </button>
+    <button class="backup-option" id="backup-import-btn" type="button">
+      <span class="backup-option-icon" aria-hidden="true">↑</span>
+      <span>
+        <strong id="backup-import-title">Restore backup</strong>
+        <span id="backup-import-desc">Replace current notebooks from a MathNote JSON backup.</span>
+      </span>
+    </button>
+    <input id="backup-file-input" type="file" accept=".json,application/json" hidden>
+    <div class="modal-actions" style="margin-top:12px">
+      <button id="backup-close">Close</button>
     </div>
   </div>
 </div>

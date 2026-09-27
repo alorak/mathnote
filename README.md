@@ -87,6 +87,13 @@ Sağ üstteki **Export** düğmesiyle mevcut sekme içeriği şu biçimlerde dı
 ### Dil Desteği
 Sağ üstteki **EN / TR** geçişiyle arayüz dili değiştirilebilir. Tercih `localStorage`'a kaydedilir.
 
+### Offline durum, yedekleme ve kayıt
+- Alt durum çubuğu tarayıcının çevrimiçi / çevrimdışı durumunu anlık gösterir.
+- **Yedek** düğmesi tüm notebook'ları, aktif sekmeyi ve temel görünüm tercihlerini tek bir sürümlü JSON dosyasında dışa aktarır.
+- Aynı JSON yedeği geri yüklenebilir; dosya biçimi ve notebook kayıtları uygulanmadan önce doğrulanır.
+- Editör yazımları `localStorage`'a 300 ms debounce ile kaydedilir; sekme değişimi, dosya oluşturma/silme ve restore gibi yapısal işlemler anında kalıcılaştırılır.
+- Sayfa arka plana geçerken bekleyen kayıt otomatik olarak flush edilir.
+
 ---
 
 ## Kullanım
