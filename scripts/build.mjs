@@ -2,26 +2,30 @@ import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const outdir = new URL('../dist/', import.meta.url);
+const assetsDir = new URL('../dist/assets/', import.meta.url);
 const templateUrl = new URL('../index.html', import.meta.url);
 const publicDir = new URL('../public/', import.meta.url);
 const serviceWorkerTemplateUrl = new URL('../src/sw.js', import.meta.url);
+const entryPoint = fileURLToPath(new URL('../src/app.js', import.meta.url));
 
 await rm(outdir, { recursive: true, force: true });
 await mkdir(outdir, { recursive: true });
 
 await build({
-  entryPoints: [new URL('../src/app.js', import.meta.url).pathname],
+  entryPoints: { app: entryPoint },
   bundle: true,
-  outfile: new URL('../dist/app.js', import.meta.url).pathname,
+  outdir: fileURLToPath(outdir),
+  entryNames: 'assets/[name]-[hash]',
+  assetNames: 'assets/[name]-[hash]',
   format: 'iife',
   platform: 'browser',
   target: ['es2020'],
   minify: false,
   sourcemap: false,
   legalComments: 'none',
-  assetNames: 'assets/[name]-[hash]',
   loader: {
     '.woff2': 'file',
     '.woff': 'file',
@@ -29,16 +33,29 @@ await build({
   }
 });
 
+const emittedAssets = await readdir(assetsDir);
+const jsBundles = emittedAssets.filter(name => /^app-[A-Z0-9]+\.js$/i.test(name));
+const cssBundles = emittedAssets.filter(name => /^app-[A-Z0-9]+\.css$/i.test(name));
+
+if (jsBundles.length !== 1 || cssBundles.length !== 1) {
+  throw new Error(
+    `Expected one hashed JS and CSS entry bundle, found JS=${jsBundles.length}, CSS=${cssBundles.length}.`
+  );
+}
+
+const appJsPath = `./assets/${jsBundles[0]}`;
+const appCssPath = `./assets/${cssBundles[0]}`;
+
 await cp(publicDir, outdir, { recursive: true });
 
 let html = await readFile(templateUrl, 'utf8');
 html = html.replace(
   '<!-- MATHNOTE_BUILD_CSS -->',
-  '<link rel="stylesheet" href="./app.css">'
+  `<link rel="stylesheet" href="${appCssPath}">`
 );
 html = html.replace(
   '<!-- MATHNOTE_BUILD_JS -->',
-  '<script defer src="./app.js"><\\/script>'
+  `<script defer src="${appJsPath}"><\\/script>`
 );
 
 if (html.includes('MATHNOTE_BUILD_')) {
@@ -63,7 +80,10 @@ async function collectFiles(dirUrl, rootUrl = dirUrl) {
 
     files.push({
       url: childUrl,
-      path: './' + relative(rootUrl.pathname, childUrl.pathname).replaceAll('\\\\', '/')
+      path: './' + relative(
+        fileURLToPath(rootUrl),
+        fileURLToPath(childUrl)
+      ).replaceAll('\\\\', '/')
     });
   }
 
@@ -86,4 +106,6 @@ serviceWorker = serviceWorker
 
 await writeFile(new URL('../dist/sw.js', import.meta.url), serviceWorker, 'utf8');
 
-console.log(`MathNote offline/PWA bundle written to dist/ using cache ${cacheName}.`);
+console.log(
+  `MathNote offline/PWA bundle written to dist/ using ${appJsPath}, ${appCssPath} and cache ${cacheName}.`
+);

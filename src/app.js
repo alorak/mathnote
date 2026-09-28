@@ -4855,20 +4855,5 @@ document.getElementById('insert-modal').addEventListener('click', e => {
 renderTabs();
 initEditor(files[activeIdx].content);
 
-// ================================================================
-// PWA / SERVICE WORKER
-// ================================================================
-
-function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  if (!['http:', 'https:'].includes(window.location.protocol)) return;
-
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('./sw.js', { scope: './' })
-      .then(registration => registration.update().catch(() => {}))
-      .catch(error => console.warn('MathNote service worker registration failed:', error));
-  });
-}
-
-registerServiceWorker();
+// Service worker registration is intentionally handled by the small inline
+// bootstrap in index.html. This keeps PWA recovery independent from app boot.
