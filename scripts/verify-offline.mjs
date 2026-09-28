@@ -69,7 +69,7 @@ if (!app.includes("register('./sw.js'") && !app.includes('register("./sw.js"')) 
   violations.push('app.js: relative service worker registration missing');
 }
 
-if (!app.includes("getElementById('examples-btn')") || !app.includes('openExamplesNotebook')) {
+if (!app.includes('examples-btn') || !app.includes('getDefaultContent')) {
   violations.push('app.js: examples loader wiring missing');
 }
 
