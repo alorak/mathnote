@@ -628,8 +628,13 @@ function createNotebookId() {
 }
 
 function normalizeNotebookFile(file) {
+  const incomingId = typeof file?.id === 'string' ? file.id : '';
+  const safeId = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(incomingId)
+    ? incomingId
+    : createNotebookId();
+
   return {
-    id: typeof file?.id === 'string' && file.id ? file.id : createNotebookId(),
+    id: safeId,
     name: String(file?.name || 'notebook.math'),
     content: String(file?.content || '')
   };
@@ -749,7 +754,21 @@ function loadHistoryStore() {
     if (!raw) return { version: HISTORY_VERSION, byFile: {} };
     const parsed = JSON.parse(raw);
     if (parsed?.version === HISTORY_VERSION && parsed.byFile && typeof parsed.byFile === 'object') {
-      return parsed;
+      const byFile = {};
+      for (const [fileId, revisions] of Object.entries(parsed.byFile)) {
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(fileId) || !Array.isArray(revisions)) continue;
+        const clean = revisions
+          .filter(item =>
+            item &&
+            Number.isFinite(item.at) &&
+            typeof item.content === 'string' &&
+            (item.reason === 'auto' || item.reason === 'beforeRestore')
+          )
+          .map(item => ({ at: item.at, reason: item.reason, content: item.content }))
+          .slice(-HISTORY_LIMIT_PER_FILE);
+        if (clean.length) byFile[fileId] = clean;
+      }
+      return { version: HISTORY_VERSION, byFile };
     }
   } catch {}
   return { version: HISTORY_VERSION, byFile: {} };
