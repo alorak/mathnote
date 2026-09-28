@@ -60,6 +60,10 @@ if (!html.includes('rel="manifest" href="./manifest.webmanifest"')) {
 if (!html.includes('id="examples-btn"')) {
   violations.push('index.html: examples button missing');
 }
+
+for (const id of ['search-btn', 'search-modal', 'notebook-search-input', 'tab-context-menu', 'undo-toast', 'undo-close-btn']) {
+  if (!html.includes(`id="${id}"`)) violations.push(`index.html: ${id} missing`);
+}
 if (!html.includes("updateViaCache: 'none'")) {
   violations.push('index.html: service worker bootstrap must bypass HTTP cache');
 }
@@ -89,6 +93,18 @@ if (cssMatch) {
 }
 
 const sourceApp = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+for (const symbol of [
+  'renameNotebook',
+  'duplicateNotebook',
+  'reorderNotebooks',
+  'undoCloseNotebook',
+  'openNotebookSearch',
+  'renderNotebookSearchResults',
+  "event.key.toLowerCase() === 'k'"
+]) {
+  if (!sourceApp.includes(symbol)) violations.push(`src/app.js: notebook management/search symbol missing: ${symbol}`);
+}
+
 if (sourceApp.includes("serviceWorker.register") || sourceApp.includes(".register('./sw.js'")) {
   violations.push('src/app.js: service worker registration must stay independent from app boot');
 }

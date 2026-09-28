@@ -77,8 +77,17 @@ Sağ üstteki **Export** düğmesiyle mevcut sekme içeriği şu biçimlerde dı
 
 ### Çoklu Sekme
 - `+` düğmesiyle yeni dosya/sekme oluşturma
+- Sekme adına çift tıklayarak veya sağ tık menüsünden yeniden adlandırma
+- Sağ tık menüsünden notebook kopyalama
+- Sekmeleri sürükle-bırak ile yeniden sıralama
+- Kapatılan notebook'u 8 saniye içinde **Geri Al** ile geri getirme
 - Sekmeler `localStorage`'da kalıcı olarak saklanır
-- Sekme adı çift tıkla düzenlenebilir
+
+### Notebook Arama
+- Üst bardaki **Ara / Search** düğmesi veya `Ctrl/Cmd + K` ile tüm notebook'larda arama
+- Dosya adı ve satır içeriği birlikte aranır
+- Sonuçlarda notebook adı, satır numarası ve içerik önizlemesi gösterilir
+- Sonuca tıklanınca ilgili notebook açılır ve eşleşen satıra odaklanılır
 
 ### Ekle Modalı
 `+` FAB (sağ alt) veya klavye kısayoluyla açılır. Şablonlu form üzerinden şunlar eklenebilir:
@@ -132,6 +141,7 @@ Bu kontrol, build çıktısında uzak script/style/module bağlantısı kalmadı
 |---------|-------|
 | `Ctrl` + `+` | Yakınlaştır |
 | `Ctrl` + `-` | Uzaklaştır |
+| `Ctrl/Cmd` + `K` | Tüm notebook'larda ara |
 
 ---
 
