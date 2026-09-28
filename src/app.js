@@ -36,6 +36,20 @@ const translations = {
     copySuffix: 'copy',
     notebookClosed: 'Notebook closed.',
     undo: 'Undo',
+    historyBtn: 'History',
+    historyTitle: 'Revision history',
+    historyDesc: 'Recent local snapshots for the active notebook.',
+    historyEmpty: 'No revisions yet. Snapshots are created after short editing pauses.',
+    historyRestore: 'Restore',
+    historyRestoreConfirm: 'Restore this revision? The current content will be saved to history first.',
+    historyClose: 'Close',
+    historySnapshotAuto: 'Auto snapshot',
+    historySnapshotBeforeRestore: 'Before restore',
+    examplesGalleryTitle: 'Example gallery',
+    examplesGalleryDesc: 'Choose a topic to open it as a new notebook.',
+    examplesClose: 'Close',
+    saving: 'Saving…',
+    saved: 'Saved',
     
     // Modal
     modalTitle: 'Create New File',
@@ -242,6 +256,20 @@ const translations = {
     copySuffix: 'kopya',
     notebookClosed: 'Not defteri kapatıldı.',
     undo: 'Geri Al',
+    historyBtn: 'Geçmiş',
+    historyTitle: 'Sürüm geçmişi',
+    historyDesc: 'Aktif not defterinin son yerel anlık görüntüleri.',
+    historyEmpty: 'Henüz sürüm yok. Kısa yazma molalarından sonra otomatik görüntü alınır.',
+    historyRestore: 'Geri yükle',
+    historyRestoreConfirm: 'Bu sürüm geri yüklensin mi? Mevcut içerik önce geçmişe kaydedilecek.',
+    historyClose: 'Kapat',
+    historySnapshotAuto: 'Otomatik görüntü',
+    historySnapshotBeforeRestore: 'Geri yükleme öncesi',
+    examplesGalleryTitle: 'Örnekler galerisi',
+    examplesGalleryDesc: 'Yeni bir not defteri olarak açmak istediğiniz konuyu seçin.',
+    examplesClose: 'Kapat',
+    saving: 'Kaydediliyor…',
+    saved: 'Kaydedildi',
     
     // Modal
     modalTitle: 'Yeni Dosya Oluştur',
@@ -462,6 +490,26 @@ function updateUILanguage() {
     examplesBtn.textContent = t('examplesBtn');
     examplesBtn.title = t('examplesTitle');
   }
+  const historyBtn = document.getElementById('history-btn');
+  if (historyBtn) {
+    historyBtn.textContent = t('historyBtn');
+    historyBtn.title = t('historyTitle');
+  }
+  const examplesTitle = document.getElementById('examples-modal-title');
+  const examplesDesc = document.getElementById('examples-modal-desc');
+  const examplesClose = document.getElementById('examples-close');
+  if (examplesTitle) examplesTitle.textContent = t('examplesGalleryTitle');
+  if (examplesDesc) examplesDesc.textContent = t('examplesGalleryDesc');
+  if (examplesClose) examplesClose.textContent = t('examplesClose');
+  const historyTitle = document.getElementById('history-modal-title');
+  const historyDesc = document.getElementById('history-modal-desc');
+  const historyClose = document.getElementById('history-close');
+  if (historyTitle) historyTitle.textContent = t('historyTitle');
+  if (historyDesc) historyDesc.textContent = t('historyDesc');
+  if (historyClose) historyClose.textContent = t('historyClose');
+  if (document.getElementById('examples-modal')?.classList.contains('active')) renderExamplesGallery();
+  if (document.getElementById('history-modal')?.classList.contains('active')) renderRevisionHistory();
+  if (typeof saveState !== 'undefined') setSaveState(saveState);
   document.getElementById('zoom-in').title = t('zoomIn');
   document.getElementById('zoom-out').title = t('zoomOut');
   
@@ -568,6 +616,24 @@ document.addEventListener('DOMContentLoaded', () => {
 // ================================================================
 
 const STORAGE_KEY = 'mathnotebook_v1';
+const HISTORY_KEY = 'mathnotebook_history_v1';
+const HISTORY_VERSION = 1;
+const HISTORY_LIMIT_PER_FILE = 20;
+const HISTORY_TOTAL_BYTES = 1_500_000;
+const HISTORY_IDLE_MS = 5000;
+
+function createNotebookId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return 'nb-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+function normalizeNotebookFile(file) {
+  return {
+    id: typeof file?.id === 'string' && file.id ? file.id : createNotebookId(),
+    name: String(file?.name || 'notebook.math'),
+    content: String(file?.content || '')
+  };
+}
 
 function getDefaultContent() {
   const c = currentLang === 'tr' ? {
@@ -629,11 +695,12 @@ function loadFiles() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0 &&
-          parsed.every(f => f && typeof f.name === 'string' && typeof f.content === 'string'))
-        return parsed;
+          parsed.every(f => f && typeof f.name === 'string' && typeof f.content === 'string')) {
+        return parsed.map(normalizeNotebookFile);
+      }
     }
   } catch {}
-  return [{ name: 'notebook.math', content: DEFAULT_CONTENT }];
+  return [normalizeNotebookFile({ name: 'notebook.math', content: DEFAULT_CONTENT })];
 }
 
 let files = loadFiles();
@@ -642,6 +709,15 @@ let view = null;
 
 const SAVE_DEBOUNCE_MS = 300;
 let saveTimer = null;
+let saveState = 'saved';
+
+function setSaveState(state) {
+  saveState = state;
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  el.dataset.state = state;
+  el.textContent = t(state === 'saving' ? 'saving' : 'saved');
+}
 
 function saveNow() {
   if (saveTimer !== null) {
@@ -649,18 +725,134 @@ function saveNow() {
     saveTimer = null;
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+  setSaveState('saved');
 }
 
 function scheduleSave() {
+  setSaveState('saving');
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     saveTimer = null;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+    setSaveState('saved');
   }, SAVE_DEBOUNCE_MS);
+}
+
+function loadHistoryStore() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return { version: HISTORY_VERSION, byFile: {} };
+    const parsed = JSON.parse(raw);
+    if (parsed?.version === HISTORY_VERSION && parsed.byFile && typeof parsed.byFile === 'object') {
+      return parsed;
+    }
+  } catch {}
+  return { version: HISTORY_VERSION, byFile: {} };
+}
+
+let historyStore = loadHistoryStore();
+let revisionTimer = null;
+let pendingRevision = null;
+
+function estimatedHistoryBytes() {
+  return JSON.stringify(historyStore).length * 2;
+}
+
+function trimHistoryStore() {
+  for (const id of Object.keys(historyStore.byFile)) {
+    const revisions = Array.isArray(historyStore.byFile[id]) ? historyStore.byFile[id] : [];
+    historyStore.byFile[id] = revisions.slice(-HISTORY_LIMIT_PER_FILE);
+    if (!historyStore.byFile[id].length) delete historyStore.byFile[id];
+  }
+
+  while (estimatedHistoryBytes() > HISTORY_TOTAL_BYTES) {
+    let oldestId = null;
+    let oldestAt = Infinity;
+    for (const [id, revisions] of Object.entries(historyStore.byFile)) {
+      if (revisions.length && revisions[0].at < oldestAt) {
+        oldestAt = revisions[0].at;
+        oldestId = id;
+      }
+    }
+    if (!oldestId) break;
+    historyStore.byFile[oldestId].shift();
+    if (!historyStore.byFile[oldestId].length) delete historyStore.byFile[oldestId];
+  }
+}
+
+function persistHistoryStore() {
+  trimHistoryStore();
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(historyStore));
+  } catch {
+    // If the browser quota is tighter than expected, discard oldest revisions
+    // until the store can be persisted again.
+    for (let i = 0; i < 8; i++) {
+      let oldestId = null;
+      let oldestAt = Infinity;
+      for (const [id, revisions] of Object.entries(historyStore.byFile)) {
+        if (revisions.length && revisions[0].at < oldestAt) {
+          oldestAt = revisions[0].at;
+          oldestId = id;
+        }
+      }
+      if (!oldestId) break;
+      historyStore.byFile[oldestId].shift();
+      if (!historyStore.byFile[oldestId].length) delete historyStore.byFile[oldestId];
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(historyStore));
+        break;
+      } catch {}
+    }
+  }
+}
+
+function recordRevisionSnapshot(fileId, content, reason = 'auto') {
+  if (!fileId || typeof content !== 'string') return;
+  const revisions = historyStore.byFile[fileId] || (historyStore.byFile[fileId] = []);
+  const latest = revisions[revisions.length - 1];
+  if (latest?.content === content) return;
+
+  revisions.push({
+    at: Date.now(),
+    reason,
+    content
+  });
+  if (revisions.length > HISTORY_LIMIT_PER_FILE) {
+    revisions.splice(0, revisions.length - HISTORY_LIMIT_PER_FILE);
+  }
+  persistHistoryStore();
+}
+
+function flushPendingRevisionSnapshot() {
+  if (revisionTimer !== null) {
+    clearTimeout(revisionTimer);
+    revisionTimer = null;
+  }
+  if (!pendingRevision) return;
+  recordRevisionSnapshot(pendingRevision.fileId, pendingRevision.content, 'auto');
+  pendingRevision = null;
+}
+
+function scheduleRevisionSnapshot(file, previousContent, nextContent) {
+  if (!file?.id || previousContent === nextContent) return;
+
+  if (pendingRevision && pendingRevision.fileId !== file.id) {
+    flushPendingRevisionSnapshot();
+  }
+
+  if (!pendingRevision) {
+    recordRevisionSnapshot(file.id, previousContent, 'auto');
+  }
+
+  pendingRevision = { fileId: file.id, content: nextContent };
+  if (revisionTimer !== null) clearTimeout(revisionTimer);
+  revisionTimer = window.setTimeout(flushPendingRevisionSnapshot, HISTORY_IDLE_MS);
 }
 
 function flushPendingSave() {
   if (saveTimer !== null) saveNow();
+  flushPendingRevisionSnapshot();
 }
 
 window.addEventListener('pagehide', flushPendingSave);
@@ -724,10 +916,10 @@ function duplicateNotebook(idx) {
   if (!file) return;
   syncActiveFileContent();
 
-  const copy = {
+  const copy = normalizeNotebookFile({
     name: uniqueCopyName(file.name),
     content: file.content
-  };
+  });
 
   files.splice(idx + 1, 0, copy);
   activeIdx = idx + 1;
@@ -850,6 +1042,7 @@ function renderTabs() {
 
 function switchTo(idx) {
   if (!files[idx]) return;
+  flushPendingRevisionSnapshot();
   if (view) {
     syncActiveFileContent();
     saveNow();
@@ -889,20 +1082,189 @@ function newFile(initialContent) {
   input.select();
 }
 
-function openExamplesNotebook() {
-  newFile(getDefaultContent());
-  const input = document.getElementById('new-file-input');
-  input.value = t('examplesFileName');
-  input.select();
+function getExampleTemplates() {
+  const tr = currentLang === 'tr';
+  return [
+    {
+      id: 'basic',
+      icon: '±',
+      title: tr ? 'Temel İşlemler' : 'Basic Operations',
+      desc: tr ? 'Aritmetik, sabitler ve değişkenler.' : 'Arithmetic, constants and variables.',
+      filename: tr ? 'temel-islemler.math' : 'basic-operations.math',
+      content: [
+        tr ? '# Temel İşlemler' : '# Basic Operations',
+        '2 + 3',
+        '10 * 5 - 3',
+        'sqrt(16)',
+        '2 ^ 10',
+        '',
+        tr ? '# Değişkenler' : '# Variables',
+        'r = 5',
+        'alan = pi * r^2',
+        'hacim = (4/3) * pi * r^3'
+      ].join('\n')
+    },
+    {
+      id: 'functions',
+      icon: 'f',
+      title: tr ? 'Fonksiyonlar' : 'Functions',
+      desc: tr ? 'Fonksiyon tanımlama ve değerlendirme.' : 'Function definitions and evaluation.',
+      filename: tr ? 'fonksiyonlar.math' : 'functions.math',
+      content: [
+        tr ? '# Fonksiyonlar' : '# Functions',
+        'f(x) = x^2 + 2*x + 1',
+        'f(3)',
+        'f(0)',
+        '',
+        'hyp(a, b) = sqrt(a^2 + b^2)',
+        'hyp(3, 4)'
+      ].join('\n')
+    },
+    {
+      id: 'derivative',
+      icon: '∂',
+      title: tr ? 'Türev' : 'Derivative',
+      desc: tr ? 'Türev ve fonksiyon analiz paneli.' : 'Derivative and function analysis panel.',
+      filename: tr ? 'turev.math' : 'derivative.math',
+      content: [
+        tr ? '# Türev' : '# Derivative',
+        'f(x) = x^3 + 2*x^2 - x',
+        'derivative("x^3 + 2*x^2 - x", "x")',
+        '',
+        tr ? '# Analiz için fonksiyon satırını seçin' : '# Select the function line for analysis'
+      ].join('\n')
+    },
+    {
+      id: 'equations',
+      icon: '=',
+      title: tr ? 'Denklem & Eşitsizlik' : 'Equations & Inequalities',
+      desc: tr ? 'Sembolik çözüm ve eşitsizlik örnekleri.' : 'Symbolic solving and inequality examples.',
+      filename: tr ? 'denklem-esitsizlik.math' : 'equations-inequalities.math',
+      content: [
+        tr ? '# Denklemler' : '# Equations',
+        'x^2 - 4 = 0',
+        '2*x + 1 = 7',
+        '',
+        tr ? '# Eşitsizlikler' : '# Inequalities',
+        'x + 1 > 3',
+        'x^2 <= 9'
+      ].join('\n')
+    },
+    {
+      id: 'matrix',
+      icon: '▦',
+      title: tr ? 'Matris & Vektör' : 'Matrix & Vector',
+      desc: tr ? 'Matris ve vektör tanımları.' : 'Matrix and vector definitions.',
+      filename: tr ? 'matris-vektor.math' : 'matrix-vector.math',
+      content: [
+        tr ? '# Vektör' : '# Vector',
+        'v = [1, 2, 3, 4]',
+        '',
+        tr ? '# Matris' : '# Matrix',
+        'A = [[1, 2], [3, 4]]',
+        'B = [[2, 0], [1, 2]]',
+        'A * B'
+      ].join('\n')
+    },
+    {
+      id: 'units',
+      icon: 'm',
+      title: tr ? 'Birimler' : 'Units',
+      desc: tr ? 'Fiziksel birimler ve dönüşümler.' : 'Physical units and conversions.',
+      filename: tr ? 'birimler.math' : 'units.math',
+      content: [
+        tr ? '# Birim Sistemi' : '# Unit System',
+        '9.8 m/s^2 * 70 kg',
+        'force = 9.8 m/s^2 * 70 kg',
+        '5 kg + 3 kg',
+        '(50 km/hour) to m/s',
+        '100 celsius to fahrenheit',
+        '5 inch to cm'
+      ].join('\n')
+    },
+    {
+      id: 'plots',
+      icon: '⌁',
+      title: tr ? 'Grafikler' : 'Plots',
+      desc: tr ? 'Tek ve çoklu fonksiyon grafikleri.' : 'Single and multiple function plots.',
+      filename: tr ? 'grafikler.math' : 'plots.math',
+      content: [
+        tr ? '# Grafikler' : '# Plots',
+        'plot(sin(x), cos(x))',
+        'plot(x^2 - 4, -(x^2) + 4)'
+      ].join('\n')
+    }
+  ];
 }
 
-document.getElementById('examples-btn')?.addEventListener('click', openExamplesNotebook);
+function renderExamplesGallery() {
+  const grid = document.getElementById('examples-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  for (const template of getExampleTemplates()) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'example-card';
+    button.dataset.exampleId = template.id;
+
+    const icon = document.createElement('span');
+    icon.className = 'example-card-icon';
+    icon.textContent = template.icon;
+
+    const body = document.createElement('span');
+    body.className = 'example-card-body';
+
+    const title = document.createElement('strong');
+    title.textContent = template.title;
+    const desc = document.createElement('span');
+    desc.textContent = template.desc;
+
+    body.appendChild(title);
+    body.appendChild(desc);
+    button.appendChild(icon);
+    button.appendChild(body);
+    grid.appendChild(button);
+  }
+}
+
+function openExamplesGallery() {
+  renderExamplesGallery();
+  document.getElementById('examples-modal')?.classList.add('active');
+}
+
+function openExampleTemplate(exampleId) {
+  const template = getExampleTemplates().find(item => item.id === exampleId);
+  if (!template) return;
+
+  document.getElementById('examples-modal')?.classList.remove('active');
+  newFile(template.content);
+  const input = document.getElementById('new-file-input');
+  if (input) {
+    input.value = template.filename;
+    input.select();
+  }
+}
+
+document.getElementById('examples-btn')?.addEventListener('click', openExamplesGallery);
+document.getElementById('examples-close')?.addEventListener('click', () => {
+  document.getElementById('examples-modal')?.classList.remove('active');
+});
+document.getElementById('examples-modal')?.addEventListener('click', event => {
+  if (event.target === document.getElementById('examples-modal')) {
+    document.getElementById('examples-modal')?.classList.remove('active');
+  }
+});
+document.getElementById('examples-grid')?.addEventListener('click', event => {
+  const button = event.target.closest('[data-example-id]');
+  if (button) openExampleTemplate(button.dataset.exampleId);
+});
 
 function confirmNewFile() {
   const input = document.getElementById('new-file-input');
   const name = input.value.trim();
   if (name) {
-    files.push({ name, content: pendingNewFileContent });
+    files.push(normalizeNotebookFile({ name, content: pendingNewFileContent }));
     pendingNewFileContent = '';
     saveNow();
     switchTo(files.length - 1);
@@ -1076,6 +1438,106 @@ document.addEventListener('keydown', event => {
   }
 });
 
+// ── Revision history ───────────────────────────────────────────────────────────
+function formatRevisionTime(timestamp) {
+  try {
+    return new Intl.DateTimeFormat(currentLang === 'tr' ? 'tr-TR' : 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date(timestamp));
+  } catch {
+    return new Date(timestamp).toLocaleString();
+  }
+}
+
+function renderRevisionHistory() {
+  const list = document.getElementById('history-list');
+  const nameEl = document.getElementById('history-notebook-name');
+  if (!list) return;
+
+  syncActiveFileContent();
+  const file = files[activeIdx];
+  if (!file) return;
+
+  if (nameEl) nameEl.textContent = file.name;
+  list.innerHTML = '';
+
+  const revisions = [...(historyStore.byFile[file.id] || [])].reverse();
+  if (!revisions.length) {
+    const empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = t('historyEmpty');
+    list.appendChild(empty);
+    return;
+  }
+
+  revisions.forEach(revision => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+
+    const top = document.createElement('div');
+    top.className = 'history-item-top';
+
+    const time = document.createElement('span');
+    time.className = 'history-time';
+    time.textContent = formatRevisionTime(revision.at);
+
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.className = 'history-restore';
+    restore.textContent = t('historyRestore');
+    restore.dataset.revisionAt = String(revision.at);
+
+    const preview = document.createElement('pre');
+    preview.className = 'history-preview';
+    const lines = revision.content.split('\n').filter(line => line.trim()).slice(0, 3);
+    preview.textContent = lines.join('\n') || '—';
+
+    top.appendChild(time);
+    top.appendChild(restore);
+    item.appendChild(top);
+    item.appendChild(preview);
+    list.appendChild(item);
+  });
+}
+
+function openRevisionHistory() {
+  syncActiveFileContent();
+  flushPendingRevisionSnapshot();
+  renderRevisionHistory();
+  document.getElementById('history-modal')?.classList.add('active');
+}
+
+function restoreRevision(timestamp) {
+  const file = files[activeIdx];
+  if (!file) return;
+  const revision = (historyStore.byFile[file.id] || []).find(item => item.at === timestamp);
+  if (!revision) return;
+  if (!confirm(t('historyRestoreConfirm'))) return;
+
+  syncActiveFileContent();
+  recordRevisionSnapshot(file.id, file.content, 'beforeRestore');
+  file.content = revision.content;
+  saveNow();
+  replaceEditorContent(file.content);
+  renderRevisionHistory();
+}
+
+document.getElementById('history-btn')?.addEventListener('click', openRevisionHistory);
+document.getElementById('history-close')?.addEventListener('click', () => {
+  document.getElementById('history-modal')?.classList.remove('active');
+});
+document.getElementById('history-modal')?.addEventListener('click', event => {
+  if (event.target === document.getElementById('history-modal')) {
+    document.getElementById('history-modal')?.classList.remove('active');
+  }
+});
+document.getElementById('history-list')?.addEventListener('click', event => {
+  const button = event.target.closest('[data-revision-at]');
+  if (!button) return;
+  restoreRevision(Number(button.dataset.revisionAt));
+});
+
 // ── Export ────────────────────────────────────────────────────────────────────
 document.getElementById('export-btn').addEventListener('click', () => {
   document.getElementById('export-modal').classList.add('active');
@@ -1142,7 +1604,7 @@ function createBackupPayload() {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    files: files.map(file => ({ name: file.name, content: file.content })),
+    files: files.map(file => ({ id: file.id, name: file.name, content: file.content })),
     activeIndex: activeIdx,
     preferences: {
       language: currentLang,
@@ -1171,7 +1633,7 @@ function normalizeBackup(raw) {
     if (typeof file.name !== 'string' || typeof file.content !== 'string') return null;
     const name = file.name.trim();
     if (!name || name.length > 255) return null;
-    restoredFiles.push({ name, content: file.content });
+    restoredFiles.push(normalizeNotebookFile({ id: file.id, name, content: file.content }));
   }
 
   const requestedIndex = Number.isInteger(raw.activeIndex) ? raw.activeIndex : 0;
@@ -5011,7 +5473,10 @@ function initEditor(initialContent) {
         if (ignoreNextChange) { ignoreNextChange = false; return; }
 
         const content = upd.state.doc.toString();
-        files[activeIdx].content = content;
+        const activeFile = files[activeIdx];
+        const previousContent = activeFile.content;
+        activeFile.content = content;
+        scheduleRevisionSnapshot(activeFile, previousContent, content);
         scheduleSave();
 
         const result = evalAll(content);

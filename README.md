@@ -96,15 +96,24 @@ Sağ üstteki **Export** düğmesiyle mevcut sekme içeriği şu biçimlerde dı
 ### Dil Desteği
 Sağ üstteki **EN / TR** geçişiyle arayüz dili değiştirilebilir. Tercih `localStorage`'a kaydedilir.
 
-### Örnekleri yeniden yükleme
-Üst bardaki **Örnekler** düğmesi güncel dildeki örnek içeriği yeni bir notebook olarak açar. Mevcut notebook'ları veya `localStorage` verisini silmez; böylece daha önce kullanıcı verisi kaydedilmiş olsa bile örnekler tekrar yüklenebilir.
+### Örnekler Galerisi
+Üst bardaki **Örnekler** düğmesi konu bazlı bir galeri açar. Temel İşlemler, Fonksiyonlar, Türev, Denklem & Eşitsizlik, Matris & Vektör, Birimler ve Grafikler örnekleri ayrı notebook olarak oluşturulabilir. Mevcut notebook'lara dokunulmaz.
+
+### Yerel Sürüm Geçmişi
+- Üst bardaki **Geçmiş / History** düğmesi aktif notebook'un son sürümlerini gösterir.
+- Editörde 5 saniyelik yazma molası olduğunda otomatik snapshot alınır.
+- Notebook başına son **20** snapshot tutulur.
+- Tüm revision history yaklaşık **1.5 MB** ile sınırlandırılır; sınır aşılırsa en eski sürümler otomatik budanır.
+- Bir sürüm geri yüklenmeden önce mevcut içerik ayrıca geçmişe kaydedilir.
+- History ayrı bir `localStorage` anahtarında tutulur ve rename/reorder işlemlerinden etkilenmemesi için notebook kimliğiyle eşleştirilir.
 
 ### Offline durum, yedekleme ve kayıt
 - Alt durum çubuğu tarayıcının çevrimiçi / çevrimdışı durumunu anlık gösterir.
 - **Yedek** düğmesi tüm notebook'ları, aktif sekmeyi ve temel görünüm tercihlerini tek bir sürümlü JSON dosyasında dışa aktarır.
 - Aynı JSON yedeği geri yüklenebilir; dosya biçimi ve notebook kayıtları uygulanmadan önce doğrulanır.
 - Editör yazımları `localStorage`'a 300 ms debounce ile kaydedilir; sekme değişimi, dosya oluşturma/silme ve restore gibi yapısal işlemler anında kalıcılaştırılır.
-- Sayfa arka plana geçerken bekleyen kayıt otomatik olarak flush edilir.
+- Durum çubuğu kayıt sırasında **Kaydediliyor…**, tamamlandığında **Kaydedildi** durumunu gösterir.
+- Sayfa arka plana geçerken bekleyen kayıt ve revision snapshot otomatik olarak flush edilir.
 
 ---
 
