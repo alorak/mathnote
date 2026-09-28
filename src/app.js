@@ -424,8 +424,11 @@ function setLanguage(lang) {
 function updateUILanguage() {
   // Update tooltips
   document.getElementById('new-tab-btn').title = t('newFileBtn');
-  document.getElementById('examples-btn').textContent = t('examplesBtn');
-  document.getElementById('examples-btn').title = t('examplesTitle');
+  const examplesBtn = document.getElementById('examples-btn');
+  if (examplesBtn) {
+    examplesBtn.textContent = t('examplesBtn');
+    examplesBtn.title = t('examplesTitle');
+  }
   document.getElementById('zoom-in').title = t('zoomIn');
   document.getElementById('zoom-out').title = t('zoomOut');
   
@@ -440,16 +443,26 @@ function updateUILanguage() {
   document.getElementById('export-confirm').textContent = t('exportConfirm');
   document.getElementById('export-pdf-label').innerHTML = `PDF <small>${t('exportPdfHint')}</small>`;
 
-  // Update backup / restore UI
-  document.getElementById('backup-btn').textContent = t('backupBtn');
-  document.getElementById('backup-btn').title = t('backupTitle');
-  document.getElementById('backup-modal-title').textContent = t('backupTitle');
-  document.getElementById('backup-modal-desc').textContent = t('backupDesc');
-  document.getElementById('backup-export-title').textContent = t('backupExportTitle');
-  document.getElementById('backup-export-desc').textContent = t('backupExportDesc');
-  document.getElementById('backup-import-title').textContent = t('backupImportTitle');
-  document.getElementById('backup-import-desc').textContent = t('backupImportDesc');
-  document.getElementById('backup-close').textContent = t('backupClose');
+  // Update backup / restore UI. These controls are optional so an older cached
+  // HTML shell can still run safely while a newer JS bundle is being activated.
+  const backupBtn = document.getElementById('backup-btn');
+  if (backupBtn) {
+    backupBtn.textContent = t('backupBtn');
+    backupBtn.title = t('backupTitle');
+  }
+  const backupText = {
+    'backup-modal-title': t('backupTitle'),
+    'backup-modal-desc': t('backupDesc'),
+    'backup-export-title': t('backupExportTitle'),
+    'backup-export-desc': t('backupExportDesc'),
+    'backup-import-title': t('backupImportTitle'),
+    'backup-import-desc': t('backupImportDesc'),
+    'backup-close': t('backupClose')
+  };
+  for (const [id, value] of Object.entries(backupText)) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
   updateConnectivityStatus();
 
   // Update insert modal
@@ -673,7 +686,7 @@ function openExamplesNotebook() {
   input.select();
 }
 
-document.getElementById('examples-btn').addEventListener('click', openExamplesNotebook);
+document.getElementById('examples-btn')?.addEventListener('click', openExamplesNotebook);
 
 function confirmNewFile() {
   const input = document.getElementById('new-file-input');
@@ -777,7 +790,7 @@ function exportFullBackup() {
   const date = payload.exportedAt.slice(0, 10);
   const filename = `${t('backupFileName')}-${date}.json`;
   downloadBlob(JSON.stringify(payload, null, 2), filename, 'application/json;charset=utf-8');
-  document.getElementById('backup-modal').classList.remove('active');
+  document.getElementById('backup-modal')?.classList.remove('active');
 }
 
 function normalizeBackup(raw) {
@@ -834,7 +847,7 @@ function applyBackup(backup) {
     }
   }
 
-  document.getElementById('backup-modal').classList.remove('active');
+  document.getElementById('backup-modal')?.classList.remove('active');
   alert(t('backupRestored'));
 }
 
@@ -863,22 +876,22 @@ function importFullBackup(file) {
   reader.readAsText(file);
 }
 
-document.getElementById('backup-btn').addEventListener('click', () => {
-  document.getElementById('backup-modal').classList.add('active');
+document.getElementById('backup-btn')?.addEventListener('click', () => {
+  document.getElementById('backup-modal')?.classList.add('active');
 });
-document.getElementById('backup-close').addEventListener('click', () => {
-  document.getElementById('backup-modal').classList.remove('active');
+document.getElementById('backup-close')?.addEventListener('click', () => {
+  document.getElementById('backup-modal')?.classList.remove('active');
 });
-document.getElementById('backup-modal').addEventListener('click', event => {
+document.getElementById('backup-modal')?.addEventListener('click', event => {
   if (event.target === document.getElementById('backup-modal')) {
-    document.getElementById('backup-modal').classList.remove('active');
+    document.getElementById('backup-modal')?.classList.remove('active');
   }
 });
-document.getElementById('backup-export-btn').addEventListener('click', exportFullBackup);
-document.getElementById('backup-import-btn').addEventListener('click', () => {
-  document.getElementById('backup-file-input').click();
+document.getElementById('backup-export-btn')?.addEventListener('click', exportFullBackup);
+document.getElementById('backup-import-btn')?.addEventListener('click', () => {
+  document.getElementById('backup-file-input')?.click();
 });
-document.getElementById('backup-file-input').addEventListener('change', event => {
+document.getElementById('backup-file-input')?.addEventListener('change', event => {
   const [file] = event.target.files || [];
   if (file) importFullBackup(file);
 });
