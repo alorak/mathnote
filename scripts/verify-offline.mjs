@@ -65,12 +65,20 @@ if (!html.includes('id="examples-btn"')) {
 }
 
 const app = await readFile(new URL('app.js', root), 'utf8');
+const sourceApp = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
 if (!app.includes("register('./sw.js'") && !app.includes('register("./sw.js"')) {
   violations.push('app.js: relative service worker registration missing');
 }
 
 if (!app.includes('examples-btn') || !app.includes('getDefaultContent')) {
   violations.push('app.js: examples loader wiring missing');
+}
+
+for (const id of ['examples-btn', 'backup-btn', 'backup-close', 'backup-modal', 'backup-export-btn', 'backup-import-btn', 'backup-file-input']) {
+  const unsafe = `getElementById('${id}').addEventListener`;
+  if (sourceApp.includes(unsafe)) {
+    violations.push(`src/app.js: optional UI binding for ${id} is not null-safe`);
+  }
 }
 
 const manifest = JSON.parse(await readFile(new URL('manifest.webmanifest', root), 'utf8'));
@@ -92,6 +100,13 @@ if (!/mathnote-[a-f0-9]{12}/.test(sw)) {
 
 if (!sw.includes('NETWORK_FIRST_PATHS') || !sw.includes('networkFirst(request')) {
   violations.push('sw.js: mutable core assets are not network-first');
+}
+
+if (sw.includes('skipWaiting()') || sw.includes('clients.claim()')) {
+  violations.push('sw.js: eager service-worker takeover can mix HTML and JS versions');
+}
+if (!sw.includes("cache: 'no-store'")) {
+  violations.push('sw.js: network-first core fetches should bypass the HTTP cache');
 }
 if (sw.includes('caches.match(')) {
   violations.push('sw.js: cross-cache lookup can serve stale assets');
