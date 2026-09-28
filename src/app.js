@@ -22,6 +22,20 @@ const translations = {
     examplesBtn: 'Examples',
     examplesTitle: 'Load examples into a new notebook',
     examplesFileName: 'examples.math',
+    searchBtn: 'Search',
+    searchTitle: 'Search notebooks',
+    searchShortcutTitle: 'Search notebooks (Ctrl/Cmd+K)',
+    searchPlaceholder: 'Search all notebooks...',
+    searchEmpty: 'Type to search across all notebooks.',
+    searchNoResults: 'No results found.',
+    searchLine: 'line',
+    searchResults: 'results',
+    renameNotebook: 'Rename',
+    duplicateNotebook: 'Duplicate',
+    renamePrompt: 'Notebook name',
+    copySuffix: 'copy',
+    notebookClosed: 'Notebook closed.',
+    undo: 'Undo',
     
     // Modal
     modalTitle: 'Create New File',
@@ -214,6 +228,20 @@ const translations = {
     examplesBtn: 'Örnekler',
     examplesTitle: 'Örnekleri yeni bir not defterine yükle',
     examplesFileName: 'ornekler.math',
+    searchBtn: 'Ara',
+    searchTitle: 'Not defterlerinde ara',
+    searchShortcutTitle: 'Not defterlerinde ara (Ctrl/Cmd+K)',
+    searchPlaceholder: 'Tüm not defterlerinde ara...',
+    searchEmpty: 'Tüm not defterlerinde aramak için yazın.',
+    searchNoResults: 'Sonuç bulunamadı.',
+    searchLine: 'satır',
+    searchResults: 'sonuç',
+    renameNotebook: 'Yeniden adlandır',
+    duplicateNotebook: 'Kopyala',
+    renamePrompt: 'Not defteri adı',
+    copySuffix: 'kopya',
+    notebookClosed: 'Not defteri kapatıldı.',
+    undo: 'Geri Al',
     
     // Modal
     modalTitle: 'Yeni Dosya Oluştur',
@@ -424,6 +452,11 @@ function setLanguage(lang) {
 function updateUILanguage() {
   // Update tooltips
   document.getElementById('new-tab-btn').title = t('newFileBtn');
+  const searchBtn = document.getElementById('search-btn');
+  if (searchBtn) {
+    searchBtn.textContent = t('searchBtn');
+    searchBtn.title = t('searchShortcutTitle');
+  }
   const examplesBtn = document.getElementById('examples-btn');
   if (examplesBtn) {
     examplesBtn.textContent = t('examplesBtn');
@@ -442,6 +475,20 @@ function updateUILanguage() {
   document.getElementById('export-cancel').textContent = t('exportCancel');
   document.getElementById('export-confirm').textContent = t('exportConfirm');
   document.getElementById('export-pdf-label').innerHTML = `PDF <small>${t('exportPdfHint')}</small>`;
+
+  const searchTitle = document.getElementById('search-modal-title');
+  const searchInput = document.getElementById('notebook-search-input');
+  const renameAction = document.getElementById('tab-menu-rename');
+  const duplicateAction = document.getElementById('tab-menu-duplicate');
+  const undoCloseBtn = document.getElementById('undo-close-btn');
+  if (searchTitle) searchTitle.textContent = t('searchTitle');
+  if (searchInput) searchInput.placeholder = t('searchPlaceholder');
+  if (renameAction) renameAction.textContent = t('renameNotebook');
+  if (duplicateAction) duplicateAction.textContent = t('duplicateNotebook');
+  if (undoCloseBtn) undoCloseBtn.textContent = t('undo');
+  if (document.getElementById('search-modal')?.classList.contains('active')) {
+    renderNotebookSearchResults(searchInput?.value || '');
+  }
 
   // Update backup / restore UI. These controls are optional so an older cached
   // HTML shell can still run safely while a newer JS bundle is being activated.
@@ -630,12 +677,114 @@ function esc(s) {
 
 // ---- Tabs ----
 
+let contextTabIndex = -1;
+let draggingTabIndex = -1;
+
+function syncActiveFileContent() {
+  if (view && files[activeIdx]) {
+    files[activeIdx].content = view.state.doc.toString();
+  }
+}
+
+function uniqueCopyName(originalName) {
+  const dot = originalName.lastIndexOf('.');
+  const hasExt = dot > 0;
+  const base = hasExt ? originalName.slice(0, dot) : originalName;
+  const ext = hasExt ? originalName.slice(dot) : '';
+  const suffix = t('copySuffix');
+
+  let candidate = base + ' ' + suffix + ext;
+  let counter = 2;
+  const names = new Set(files.map(file => file.name));
+
+  while (names.has(candidate)) {
+    candidate = base + ' ' + suffix + ' ' + counter + ext;
+    counter++;
+  }
+  return candidate;
+}
+
+function renameNotebook(idx) {
+  const file = files[idx];
+  if (!file) return;
+  syncActiveFileContent();
+  const nextName = prompt(t('renamePrompt'), file.name);
+  if (nextName === null) return;
+
+  const cleanName = nextName.trim().slice(0, 255);
+  if (!cleanName || cleanName === file.name) return;
+
+  file.name = cleanName;
+  saveNow();
+  renderTabs();
+}
+
+function duplicateNotebook(idx) {
+  const file = files[idx];
+  if (!file) return;
+  syncActiveFileContent();
+
+  const copy = {
+    name: uniqueCopyName(file.name),
+    content: file.content
+  };
+
+  files.splice(idx + 1, 0, copy);
+  activeIdx = idx + 1;
+  saveNow();
+  renderTabs();
+  replaceEditorContent(copy.content);
+}
+
+function reorderNotebooks(from, to) {
+  if (from === to || from < 0 || to < 0 || from >= files.length || to >= files.length) return;
+  syncActiveFileContent();
+
+  const activeFile = files[activeIdx];
+  const moved = files.splice(from, 1)[0];
+  files.splice(to, 0, moved);
+  activeIdx = files.indexOf(activeFile);
+
+  saveNow();
+  renderTabs();
+}
+
+function hideTabContextMenu() {
+  const menu = document.getElementById('tab-context-menu');
+  if (!menu) return;
+  menu.classList.remove('active');
+  menu.setAttribute('aria-hidden', 'true');
+  contextTabIndex = -1;
+}
+
+function showTabContextMenu(idx, x, y) {
+  const menu = document.getElementById('tab-context-menu');
+  if (!menu) return;
+
+  contextTabIndex = idx;
+  menu.classList.add('active');
+  menu.setAttribute('aria-hidden', 'false');
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+  });
+}
+
 function renderTabs() {
   const container = document.getElementById('file-tabs');
   container.innerHTML = '';
+
   files.forEach((f, i) => {
     const tab = document.createElement('div');
     tab.className = 'file-tab' + (i === activeIdx ? ' active' : '');
+    tab.draggable = true;
+    tab.dataset.index = String(i);
 
     const nameEl = document.createElement('span');
     nameEl.className = 'name';
@@ -651,21 +800,82 @@ function renderTabs() {
     tab.appendChild(closeEl);
 
     tab.addEventListener('click', () => switchTo(i));
-    closeEl.addEventListener('click', e => { e.stopPropagation(); closeFile(i); });
+    nameEl.addEventListener('dblclick', event => {
+      event.stopPropagation();
+      renameNotebook(i);
+    });
+    closeEl.addEventListener('click', event => {
+      event.stopPropagation();
+      closeFile(i);
+    });
+
+    tab.addEventListener('contextmenu', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      showTabContextMenu(i, event.clientX, event.clientY);
+    });
+
+    tab.addEventListener('dragstart', event => {
+      draggingTabIndex = i;
+      tab.classList.add('dragging');
+      hideTabContextMenu();
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(i));
+      }
+    });
+    tab.addEventListener('dragover', event => {
+      if (draggingTabIndex < 0 || draggingTabIndex === i) return;
+      event.preventDefault();
+      tab.classList.add('drag-over');
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    });
+    tab.addEventListener('dragleave', () => tab.classList.remove('drag-over'));
+    tab.addEventListener('drop', event => {
+      event.preventDefault();
+      tab.classList.remove('drag-over');
+      if (draggingTabIndex >= 0) reorderNotebooks(draggingTabIndex, i);
+      draggingTabIndex = -1;
+    });
+    tab.addEventListener('dragend', () => {
+      draggingTabIndex = -1;
+      document.querySelectorAll('.file-tab').forEach(el => {
+        el.classList.remove('dragging', 'drag-over');
+      });
+    });
 
     container.appendChild(tab);
   });
 }
 
 function switchTo(idx) {
+  if (!files[idx]) return;
   if (view) {
-    files[activeIdx].content = view.state.doc.toString();
+    syncActiveFileContent();
     saveNow();
   }
   activeIdx = idx;
   renderTabs();
   replaceEditorContent(files[activeIdx].content);
 }
+
+document.getElementById('tab-context-menu')?.addEventListener('click', event => {
+  const button = event.target.closest('button[data-action]');
+  if (!button || contextTabIndex < 0) return;
+
+  const idx = contextTabIndex;
+  const action = button.dataset.action;
+  hideTabContextMenu();
+
+  if (action === 'rename') renameNotebook(idx);
+  if (action === 'duplicate') duplicateNotebook(idx);
+});
+
+document.addEventListener('click', event => {
+  if (!event.target.closest('#tab-context-menu')) hideTabContextMenu();
+});
+window.addEventListener('resize', hideTabContextMenu);
+window.addEventListener('scroll', hideTabContextMenu, true);
 
 let pendingNewFileContent = '';
 
@@ -707,6 +917,163 @@ document.getElementById('modal-confirm').addEventListener('click', confirmNewFil
 document.getElementById('new-file-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') confirmNewFile();
   if (e.key === 'Escape') document.getElementById('new-file-modal').classList.remove('active');
+});
+
+// ── Notebook search ────────────────────────────────────────────────────────────
+const SEARCH_RESULT_LIMIT = 100;
+
+function collectNotebookSearchResults(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  syncActiveFileContent();
+  const results = [];
+
+  files.forEach((file, fileIndex) => {
+    if (results.length >= SEARCH_RESULT_LIMIT) return;
+
+    if (file.name.toLowerCase().includes(q)) {
+      const firstLine = file.content.split('\n').find(line => line.trim()) || file.name;
+      results.push({
+        fileIndex,
+        lineNumber: 1,
+        snippet: firstLine.trim() || file.name,
+        fileName: file.name
+      });
+    }
+
+    const lines = file.content.split('\n');
+    for (let i = 0; i < lines.length && results.length < SEARCH_RESULT_LIMIT; i++) {
+      if (!lines[i].toLowerCase().includes(q)) continue;
+      results.push({
+        fileIndex,
+        lineNumber: i + 1,
+        snippet: lines[i].trim() || ' ',
+        fileName: file.name
+      });
+    }
+  });
+
+  return results;
+}
+
+function closeNotebookSearch() {
+  document.getElementById('search-modal')?.classList.remove('active');
+}
+
+function jumpToSearchResult(fileIndex, lineNumber, query) {
+  closeNotebookSearch();
+  switchTo(fileIndex);
+  if (!view) return;
+
+  const safeLine = Math.max(1, Math.min(lineNumber, view.state.doc.lines));
+  const line = view.state.doc.line(safeLine);
+  const q = query.trim().toLowerCase();
+  const offset = q ? line.text.toLowerCase().indexOf(q) : -1;
+  const from = offset >= 0 ? line.from + offset : line.from;
+  const to = offset >= 0 ? from + q.length : from;
+
+  view.dispatch({
+    selection: { anchor: from, head: to },
+    effects: EditorView.scrollIntoView(from, { y: 'center' })
+  });
+  view.focus();
+}
+
+function renderNotebookSearchResults(query) {
+  const container = document.getElementById('notebook-search-results');
+  const countEl = document.getElementById('search-result-count');
+  if (!container || !countEl) return;
+
+  container.innerHTML = '';
+  const cleanQuery = query.trim();
+
+  if (!cleanQuery) {
+    const empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = t('searchEmpty');
+    container.appendChild(empty);
+    countEl.textContent = '';
+    return;
+  }
+
+  const results = collectNotebookSearchResults(cleanQuery);
+  countEl.textContent = results.length + ' ' + t('searchResults');
+
+  if (!results.length) {
+    const empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = t('searchNoResults');
+    container.appendChild(empty);
+    return;
+  }
+
+  results.forEach(result => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'search-result';
+
+    const meta = document.createElement('div');
+    meta.className = 'search-result-meta';
+    meta.textContent = result.fileName + ' · ' + t('searchLine') + ' ' + result.lineNumber;
+
+    const snippet = document.createElement('div');
+    snippet.className = 'search-result-snippet';
+    snippet.textContent = result.snippet;
+
+    button.appendChild(meta);
+    button.appendChild(snippet);
+    button.addEventListener('click', () => {
+      jumpToSearchResult(result.fileIndex, result.lineNumber, cleanQuery);
+    });
+
+    container.appendChild(button);
+  });
+}
+
+function openNotebookSearch() {
+  syncActiveFileContent();
+  const modal = document.getElementById('search-modal');
+  const input = document.getElementById('notebook-search-input');
+  if (!modal || !input) return;
+
+  hideTabContextMenu();
+  modal.classList.add('active');
+  input.value = '';
+  renderNotebookSearchResults('');
+  requestAnimationFrame(() => input.focus());
+}
+
+document.getElementById('search-btn')?.addEventListener('click', openNotebookSearch);
+document.getElementById('notebook-search-input')?.addEventListener('input', event => {
+  renderNotebookSearchResults(event.target.value);
+});
+document.getElementById('notebook-search-input')?.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeNotebookSearch();
+  } else if (event.key === 'Enter') {
+    const first = document.querySelector('#notebook-search-results .search-result');
+    if (first) {
+      event.preventDefault();
+      first.click();
+    }
+  }
+});
+document.getElementById('search-modal')?.addEventListener('click', event => {
+  if (event.target === document.getElementById('search-modal')) closeNotebookSearch();
+});
+
+document.addEventListener('keydown', event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    openNotebookSearch();
+    return;
+  }
+  if (event.key === 'Escape') {
+    hideTabContextMenu();
+    closeNotebookSearch();
+  }
 });
 
 // ── Export ────────────────────────────────────────────────────────────────────
@@ -993,15 +1360,76 @@ document.getElementById('export-confirm').addEventListener('click', () => {
   }
 });
 
-function closeFile(idx) {
-  if (files.length === 1) { alert(t('atLeastOneFile')); return; }
-  if (!confirm(`"${files[idx].name}" ${t('confirmDelete')}`)) return;
-  files.splice(idx, 1);
-  activeIdx = Math.min(activeIdx, files.length - 1);
+let closedNotebook = null;
+let undoCloseTimer = null;
+
+function hideUndoCloseToast() {
+  const toast = document.getElementById('undo-toast');
+  if (!toast) return;
+  toast.classList.remove('active');
+  toast.setAttribute('aria-hidden', 'true');
+  if (undoCloseTimer !== null) {
+    clearTimeout(undoCloseTimer);
+    undoCloseTimer = null;
+  }
+}
+
+function showUndoCloseToast(file, index) {
+  closedNotebook = { file, index };
+  const toast = document.getElementById('undo-toast');
+  const text = document.getElementById('undo-toast-text');
+  if (!toast || !text) return;
+
+  text.textContent = file.name + ' — ' + t('notebookClosed');
+  toast.classList.add('active');
+  toast.setAttribute('aria-hidden', 'false');
+
+  if (undoCloseTimer !== null) clearTimeout(undoCloseTimer);
+  undoCloseTimer = window.setTimeout(() => {
+    closedNotebook = null;
+    hideUndoCloseToast();
+  }, 8000);
+}
+
+function undoCloseNotebook() {
+  if (!closedNotebook) return;
+  syncActiveFileContent();
+
+  const insertAt = Math.max(0, Math.min(closedNotebook.index, files.length));
+  files.splice(insertAt, 0, closedNotebook.file);
+  activeIdx = insertAt;
+  closedNotebook = null;
+
   saveNow();
   renderTabs();
   replaceEditorContent(files[activeIdx].content);
+  hideUndoCloseToast();
 }
+
+function closeFile(idx) {
+  if (files.length === 1) {
+    alert(t('atLeastOneFile'));
+    return;
+  }
+
+  syncActiveFileContent();
+  const oldActiveIdx = activeIdx;
+  const removed = files.splice(idx, 1)[0];
+  if (!removed) return;
+
+  if (idx < oldActiveIdx) {
+    activeIdx = oldActiveIdx - 1;
+  } else if (idx === oldActiveIdx) {
+    activeIdx = Math.min(idx, files.length - 1);
+  }
+
+  saveNow();
+  renderTabs();
+  if (idx === oldActiveIdx) replaceEditorContent(files[activeIdx].content);
+  showUndoCloseToast(removed, idx);
+}
+
+document.getElementById('undo-close-btn')?.addEventListener('click', undoCloseNotebook);
 
 document.getElementById('new-tab-btn').addEventListener('click', newFile);
 
