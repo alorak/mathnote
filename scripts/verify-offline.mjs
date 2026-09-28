@@ -18,6 +18,72 @@ const textExtensions = new Set(['.html', '.js', '.css', '.json', '.webmanifest',
 const violations = [];
 let fontCount = 0;
 
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+let crcTable = null;
+
+function getCrcTable() {
+  if (crcTable) return crcTable;
+  crcTable = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let value = n;
+    for (let k = 0; k < 8; k++) {
+      value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+    }
+    crcTable[n] = value >>> 0;
+  }
+  return crcTable;
+}
+
+function crc32(buffer) {
+  const table = getCrcTable();
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+async function verifyPng(path, expectedWidth, expectedHeight) {
+  const bytes = await readFile(new URL(path, root));
+  if (bytes.length < 33 || !bytes.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw new Error('invalid PNG signature');
+  }
+
+  let offset = 8;
+  let width = null;
+  let height = null;
+  let sawIend = false;
+
+  while (offset + 12 <= bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const typeStart = offset + 4;
+    const dataStart = offset + 8;
+    const crcOffset = dataStart + length;
+    const nextOffset = crcOffset + 4;
+    if (nextOffset > bytes.length) throw new Error('truncated PNG chunk');
+
+    const type = bytes.toString('ascii', typeStart, typeStart + 4);
+    const expectedCrc = bytes.readUInt32BE(crcOffset);
+    const actualCrc = crc32(bytes.subarray(typeStart, crcOffset));
+    if (actualCrc !== expectedCrc) throw new Error(`bad CRC in ${type} chunk`);
+
+    if (type === 'IHDR') {
+      width = bytes.readUInt32BE(dataStart);
+      height = bytes.readUInt32BE(dataStart + 4);
+    } else if (type === 'IEND') {
+      sawIend = true;
+      break;
+    }
+
+    offset = nextOffset;
+  }
+
+  if (!sawIend) throw new Error('missing IEND chunk');
+  if (width !== expectedWidth || height !== expectedHeight) {
+    throw new Error(`unexpected dimensions ${width}x${height}`);
+  }
+}
+
 async function walk(dirUrl) {
   const entries = await readdir(dirUrl, { withFileTypes: true });
   for (const entry of entries) {
@@ -56,6 +122,16 @@ for (const forbidden of ['cdn.jsdelivr.net', 'esm.sh', 'type="module"', 'type="i
 
 if (!html.includes('rel="manifest" href="./manifest.webmanifest"')) {
   violations.push('index.html: manifest link missing or not relative');
+}
+
+if (!html.includes('<meta name="mobile-web-app-capable" content="yes">')) {
+  violations.push('index.html: mobile-web-app-capable meta tag missing');
+}
+if (!html.includes('<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">')) {
+  violations.push('index.html: local PNG favicon missing');
+}
+if (html.includes('data:image/png;base64')) {
+  violations.push('index.html: embedded base64 favicon must not be used');
 }
 if (!html.includes('id="examples-btn"')) {
   violations.push('index.html: examples button missing');
@@ -141,6 +217,17 @@ if (manifest.display !== 'standalone') violations.push('manifest: display must b
 const iconSizes = new Set((manifest.icons || []).map(icon => icon.sizes));
 if (!iconSizes.has('192x192')) violations.push('manifest: 192x192 icon missing');
 if (!iconSizes.has('512x512')) violations.push('manifest: 512x512 icon missing');
+
+for (const [path, width, height] of [
+  ['icons/icon-192.png', 192, 192],
+  ['icons/icon-512.png', 512, 512]
+]) {
+  try {
+    await verifyPng(path, width, height);
+  } catch (error) {
+    violations.push(`${path}: ${error.message}`);
+  }
+}
 
 const sw = await readFile(new URL('sw.js', root), 'utf8');
 if (sw.includes('__CACHE_NAME__') || sw.includes('__PRECACHE_ASSETS__')) {
