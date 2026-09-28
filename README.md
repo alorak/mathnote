@@ -87,6 +87,9 @@ Sağ üstteki **Export** düğmesiyle mevcut sekme içeriği şu biçimlerde dı
 ### Dil Desteği
 Sağ üstteki **EN / TR** geçişiyle arayüz dili değiştirilebilir. Tercih `localStorage`'a kaydedilir.
 
+### Örnekleri yeniden yükleme
+Üst bardaki **Örnekler** düğmesi güncel dildeki örnek içeriği yeni bir notebook olarak açar. Mevcut notebook'ları veya `localStorage` verisini silmez; böylece daha önce kullanıcı verisi kaydedilmiş olsa bile örnekler tekrar yüklenebilir.
+
 ### Offline durum, yedekleme ve kayıt
 - Alt durum çubuğu tarayıcının çevrimiçi / çevrimdışı durumunu anlık gösterir.
 - **Yedek** düğmesi tüm notebook'ları, aktif sekmeyi ve temel görünüm tercihlerini tek bir sürümlü JSON dosyasında dışa aktarır.
@@ -153,6 +156,7 @@ GitHub Pages sürümü installable PWA olarak yayınlanır. Manifest, uygulama i
 
 - `start_url` ve `scope` relative (`./`) tutulduğu için proje `/mathnote/` gibi GitHub Pages alt yollarında çalışır.
 - İlk başarılı ziyarette uygulama shell'i, JavaScript/CSS, KaTeX fontları, manifest ve ikonlar precache edilir.
+- `app.js`, `app.css` ve manifest gibi değişebilir çekirdek dosyalar ağ varken **network-first**, çevrimdışıyken cache fallback ile yüklenir. Bu, yeni deploy sonrasında eski JavaScript'in yanlışlıkla servis edilmesini önler.
 - Yeni build'de dosya içeriğinden yeni bir cache sürümü üretilir; service worker aktive olduğunda eski MathNote cache'leri temizlenir.
 - Service worker yalnızca HTTP/HTTPS üzerinde kaydolur. Bu nedenle `dist/index.html` dosyasını doğrudan `file://` ile açma desteği korunur.
 - Destekleyen tarayıcılar MathNote'u masaüstüne veya ana ekrana bağımsız uygulama olarak kurabilir.
