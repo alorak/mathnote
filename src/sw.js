@@ -12,7 +12,8 @@ const NETWORK_FIRST_PATHS = new Set(
 
 async function networkFirst(request, fallbackUrl = null) {
   try {
-    const response = await fetch(request);
+    const freshRequest = new Request(request, { cache: 'no-store' });
+    const response = await fetch(freshRequest);
     if (!response || !response.ok) throw new Error('Network response was not OK');
 
     const cache = await caches.open(CACHE_NAME);
@@ -49,7 +50,6 @@ self.addEventListener('install', event => {
     caches
       .open(CACHE_NAME)
       .then(cache => cache.addAll(PRECACHE_ASSETS.map(scopedUrl)))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -64,7 +64,6 @@ self.addEventListener('activate', event => {
             .map(key => caches.delete(key))
         )
       )
-      .then(() => self.clients.claim())
   );
 });
 
