@@ -55,7 +55,7 @@ html = html.replace(
 );
 html = html.replace(
   '<!-- MATHNOTE_BUILD_JS -->',
-  `<script defer src="${appJsPath}"><\\/script>`
+  `<script defer src="${appJsPath}"></script>`
 );
 
 if (html.includes('MATHNOTE_BUILD_')) {
