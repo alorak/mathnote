@@ -696,7 +696,12 @@ function loadFiles() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0 &&
           parsed.every(f => f && typeof f.name === 'string' && typeof f.content === 'string')) {
-        return parsed.map(normalizeNotebookFile);
+        const normalized = parsed.map(normalizeNotebookFile);
+        const migrated = normalized.some((file, index) => file.id !== parsed[index]?.id);
+        if (migrated) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        }
+        return normalized;
       }
     }
   } catch {}
