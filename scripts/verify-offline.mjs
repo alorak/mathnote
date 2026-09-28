@@ -61,7 +61,11 @@ if (!html.includes('id="examples-btn"')) {
   violations.push('index.html: examples button missing');
 }
 
-for (const id of ['search-btn', 'search-modal', 'notebook-search-input', 'tab-context-menu', 'undo-toast', 'undo-close-btn']) {
+for (const id of [
+  'search-btn', 'search-modal', 'notebook-search-input', 'tab-context-menu',
+  'undo-toast', 'undo-close-btn', 'examples-modal', 'examples-grid',
+  'history-btn', 'history-modal', 'history-list', 'save-status'
+]) {
   if (!html.includes(`id="${id}"`)) violations.push(`index.html: ${id} missing`);
 }
 if (!html.includes("updateViaCache: 'none'")) {
@@ -100,7 +104,17 @@ for (const symbol of [
   'undoCloseNotebook',
   'openNotebookSearch',
   'renderNotebookSearchResults',
-  "event.key.toLowerCase() === 'k'"
+  "event.key.toLowerCase() === 'k'",
+  'getExampleTemplates',
+  'renderExamplesGallery',
+  'recordRevisionSnapshot',
+  'scheduleRevisionSnapshot',
+  'renderRevisionHistory',
+  'restoreRevision',
+  "HISTORY_LIMIT_PER_FILE = 20",
+  "HISTORY_TOTAL_BYTES = 1_500_000",
+  "setSaveState('saving')",
+  "setSaveState('saved')"
 ]) {
   if (!sourceApp.includes(symbol)) violations.push(`src/app.js: notebook management/search symbol missing: ${symbol}`);
 }
