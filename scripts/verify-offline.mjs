@@ -60,9 +60,17 @@ if (!html.includes('rel="manifest" href="./manifest.webmanifest"')) {
   violations.push('index.html: manifest link missing or not relative');
 }
 
+if (!html.includes('id="examples-btn"')) {
+  violations.push('index.html: examples button missing');
+}
+
 const app = await readFile(new URL('app.js', root), 'utf8');
 if (!app.includes("register('./sw.js'") && !app.includes('register("./sw.js"')) {
   violations.push('app.js: relative service worker registration missing');
+}
+
+if (!app.includes("getElementById('examples-btn')") || !app.includes('openExamplesNotebook')) {
+  violations.push('app.js: examples loader wiring missing');
 }
 
 const manifest = JSON.parse(await readFile(new URL('manifest.webmanifest', root), 'utf8'));
@@ -80,6 +88,13 @@ if (sw.includes('__CACHE_NAME__') || sw.includes('__PRECACHE_ASSETS__')) {
 }
 if (!/mathnote-[a-f0-9]{12}/.test(sw)) {
   violations.push('sw.js: content-derived cache version missing');
+}
+
+if (!sw.includes('NETWORK_FIRST_PATHS') || !sw.includes('networkFirst(request')) {
+  violations.push('sw.js: mutable core assets are not network-first');
+}
+if (sw.includes('caches.match(')) {
+  violations.push('sw.js: cross-cache lookup can serve stale assets');
 }
 for (const asset of ['./index.html', './app.js', './app.css', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png']) {
   if (!sw.includes(asset)) violations.push(`sw.js: precache entry missing for ${asset}`);

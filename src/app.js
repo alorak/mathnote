@@ -19,6 +19,9 @@ const translations = {
   en: {
     // Top bar
     newFileBtn: 'New file',
+    examplesBtn: 'Examples',
+    examplesTitle: 'Load examples into a new notebook',
+    examplesFileName: 'examples.math',
     
     // Modal
     modalTitle: 'Create New File',
@@ -208,6 +211,9 @@ const translations = {
   tr: {
     // Top bar
     newFileBtn: 'Yeni dosya',
+    examplesBtn: 'Örnekler',
+    examplesTitle: 'Örnekleri yeni bir not defterine yükle',
+    examplesFileName: 'ornekler.math',
     
     // Modal
     modalTitle: 'Yeni Dosya Oluştur',
@@ -418,6 +424,8 @@ function setLanguage(lang) {
 function updateUILanguage() {
   // Update tooltips
   document.getElementById('new-tab-btn').title = t('newFileBtn');
+  document.getElementById('examples-btn').textContent = t('examplesBtn');
+  document.getElementById('examples-btn').title = t('examplesTitle');
   document.getElementById('zoom-in').title = t('zoomIn');
   document.getElementById('zoom-out').title = t('zoomOut');
   
@@ -657,6 +665,15 @@ function newFile(initialContent) {
   input.focus();
   input.select();
 }
+
+function openExamplesNotebook() {
+  newFile(getDefaultContent());
+  const input = document.getElementById('new-file-input');
+  input.value = t('examplesFileName');
+  input.select();
+}
+
+document.getElementById('examples-btn').addEventListener('click', openExamplesNotebook);
 
 function confirmNewFile() {
   const input = document.getElementById('new-file-input');
