@@ -157,6 +157,7 @@ GitHub Pages sürümü installable PWA olarak yayınlanır. Manifest, uygulama i
 - `start_url` ve `scope` relative (`./`) tutulduğu için proje `/mathnote/` gibi GitHub Pages alt yollarında çalışır.
 - İlk başarılı ziyarette uygulama shell'i, JavaScript/CSS, KaTeX fontları, manifest ve ikonlar precache edilir.
 - `app.js`, `app.css` ve manifest gibi değişebilir çekirdek dosyalar ağ varken **network-first**, çevrimdışıyken cache fallback ile yüklenir. Bu, yeni deploy sonrasında eski JavaScript'in yanlışlıkla servis edilmesini önler.
+- Yeni service worker çalışan sayfayı zorla devralmaz; bekleyen service worker eski sekmeler kapandıktan sonra aktive olur. Böylece eski HTML ile yeni JavaScript aynı sayfada karışmaz.
 - Yeni build'de dosya içeriğinden yeni bir cache sürümü üretilir; service worker aktive olduğunda eski MathNote cache'leri temizlenir.
 - Service worker yalnızca HTTP/HTTPS üzerinde kaydolur. Bu nedenle `dist/index.html` dosyasını doğrudan `file://` ile açma desteği korunur.
 - Destekleyen tarayıcılar MathNote'u masaüstüne veya ana ekrana bağımsız uygulama olarak kurabilir.
