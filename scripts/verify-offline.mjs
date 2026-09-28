@@ -4,8 +4,6 @@ import { extname } from 'node:path';
 const root = new URL('../dist/', import.meta.url);
 const required = [
   'index.html',
-  'app.js',
-  'app.css',
   'manifest.webmanifest',
   'sw.js',
   'icons/icon-192.png',
@@ -59,19 +57,43 @@ for (const forbidden of ['cdn.jsdelivr.net', 'esm.sh', 'type="module"', 'type="i
 if (!html.includes('rel="manifest" href="./manifest.webmanifest"')) {
   violations.push('index.html: manifest link missing or not relative');
 }
-
 if (!html.includes('id="examples-btn"')) {
   violations.push('index.html: examples button missing');
 }
-
-const app = await readFile(new URL('app.js', root), 'utf8');
-const sourceApp = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
-if (!app.includes("register('./sw.js'") && !app.includes('register("./sw.js"')) {
-  violations.push('app.js: relative service worker registration missing');
+if (!html.includes("updateViaCache: 'none'")) {
+  violations.push('index.html: service worker bootstrap must bypass HTTP cache');
 }
 
+const jsMatch = html.match(/<script defer src="(\.\/assets\/app-[A-Z0-9]+\.js)"><\/script>/i);
+const cssMatch = html.match(/<link rel="stylesheet" href="(\.\/assets\/app-[A-Z0-9]+\.css)">/i);
+
+if (!jsMatch) violations.push('index.html: hashed app JS reference missing');
+if (!cssMatch) violations.push('index.html: hashed app CSS reference missing');
+
+const rootEntries = await readdir(root);
+if (rootEntries.includes('app.js') || rootEntries.includes('app.css')) {
+  violations.push('dist/: fixed-name app.js/app.css must not be emitted');
+}
+
+let app = '';
+let appJsPath = '';
+let appCssPath = '';
+
+if (jsMatch) {
+  appJsPath = jsMatch[1];
+  app = await readFile(new URL(appJsPath.slice(2), root), 'utf8');
+}
+if (cssMatch) {
+  appCssPath = cssMatch[1];
+  await readFile(new URL(appCssPath.slice(2), root), 'utf8');
+}
+
+const sourceApp = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+if (sourceApp.includes("serviceWorker.register") || sourceApp.includes(".register('./sw.js'")) {
+  violations.push('src/app.js: service worker registration must stay independent from app boot');
+}
 if (!app.includes('examples-btn') || !app.includes('getDefaultContent')) {
-  violations.push('app.js: examples loader wiring missing');
+  violations.push('app bundle: examples loader wiring missing');
 }
 
 for (const id of ['examples-btn', 'backup-btn', 'backup-close', 'backup-modal', 'backup-export-btn', 'backup-import-btn', 'backup-file-input']) {
@@ -97,22 +119,25 @@ if (sw.includes('__CACHE_NAME__') || sw.includes('__PRECACHE_ASSETS__')) {
 if (!/mathnote-[a-f0-9]{12}/.test(sw)) {
   violations.push('sw.js: content-derived cache version missing');
 }
-
 if (!sw.includes('NETWORK_FIRST_PATHS') || !sw.includes('networkFirst(request')) {
-  violations.push('sw.js: mutable core assets are not network-first');
+  violations.push('sw.js: navigation/manifest network-first strategy missing');
 }
-
 if (sw.includes('skipWaiting()') || sw.includes('clients.claim()')) {
   violations.push('sw.js: eager service-worker takeover can mix HTML and JS versions');
 }
 if (!sw.includes("cache: 'no-store'")) {
-  violations.push('sw.js: network-first core fetches should bypass the HTTP cache');
+  violations.push('sw.js: network-first fetches should bypass the HTTP cache');
 }
 if (sw.includes('caches.match(')) {
   violations.push('sw.js: cross-cache lookup can serve stale assets');
 }
-for (const asset of ['./index.html', './app.js', './app.css', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png']) {
-  if (!sw.includes(asset)) violations.push(`sw.js: precache entry missing for ${asset}`);
+
+for (const asset of ['./index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', appJsPath, appCssPath]) {
+  if (asset && !sw.includes(asset)) violations.push(`sw.js: precache entry missing for ${asset}`);
+}
+
+if (sw.includes("'./app.js'") || sw.includes("'./app.css'")) {
+  violations.push('sw.js: fixed-name application assets must not be referenced');
 }
 
 if (fontCount === 0) {
@@ -125,4 +150,6 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`Offline/PWA verification passed. ${fontCount} local font asset(s), install manifest and versioned service worker verified.`);
+console.log(
+  `Offline/PWA verification passed. Hashed bundles ${appJsPath} / ${appCssPath}, ${fontCount} local font asset(s), install manifest and versioned service worker verified.`
+);

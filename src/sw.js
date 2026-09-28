@@ -5,7 +5,7 @@ const APP_SHELL = new URL('./index.html', self.registration.scope).toString();
 
 const scopedUrl = path => new URL(path, self.registration.scope).toString();
 const NETWORK_FIRST_PATHS = new Set(
-  ['./app.js', './app.css', './manifest.webmanifest'].map(
+  ['./manifest.webmanifest'].map(
     path => new URL(path, self.registration.scope).pathname
   )
 );
@@ -84,5 +84,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Hashed JS/CSS/font assets are immutable for a given URL, so cache-first
+  // keeps offline startup fast without allowing cross-version bundle mixing.
   event.respondWith(cacheFirst(request));
 });

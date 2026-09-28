@@ -137,7 +137,7 @@ Bu kontrol, build çıktısında uzak script/style/module bağlantısı kalmadı
 
 ## Bağımlılıklar
 
-Çalışma zamanı bağımlılıkları CDN'den yüklenmez. npm paketleri sabit sürümlere pinlenir ve esbuild ile `dist/app.js` / `dist/app.css` içine bundle edilir. KaTeX fontları da `dist/assets/` altına kopyalanır.
+Çalışma zamanı bağımlılıkları CDN'den yüklenmez. npm paketleri sabit sürümlere pinlenir ve esbuild ile içerik hash'li `dist/assets/app-<hash>.js` / `app-<hash>.css` bundle'larına dönüştürülür. KaTeX fontları da `dist/assets/` altına kopyalanır.
 
 | Kütüphane | Sürüm | Amaç |
 |-----------|-------|------|
@@ -156,7 +156,7 @@ GitHub Pages sürümü installable PWA olarak yayınlanır. Manifest, uygulama i
 
 - `start_url` ve `scope` relative (`./`) tutulduğu için proje `/mathnote/` gibi GitHub Pages alt yollarında çalışır.
 - İlk başarılı ziyarette uygulama shell'i, JavaScript/CSS, KaTeX fontları, manifest ve ikonlar precache edilir.
-- `app.js`, `app.css` ve manifest gibi değişebilir çekirdek dosyalar ağ varken **network-first**, çevrimdışıyken cache fallback ile yüklenir. Bu, yeni deploy sonrasında eski JavaScript'in yanlışlıkla servis edilmesini önler.
+- Uygulama JavaScript/CSS dosyaları her build'de içerik hash'li yeni URL'ler alır. Böylece eski HTML yalnızca kendi bundle sürümünü, yeni HTML de yalnızca yeni bundle sürümünü yükler; HTML/JS sürüm karışması engellenir. Manifest ve navigasyon ağ varken **network-first**, çevrimdışıyken cache fallback ile çalışır.
 - Yeni service worker çalışan sayfayı zorla devralmaz; bekleyen service worker eski sekmeler kapandıktan sonra aktive olur. Böylece eski HTML ile yeni JavaScript aynı sayfada karışmaz.
 - Yeni build'de dosya içeriğinden yeni bir cache sürümü üretilir; service worker aktive olduğunda eski MathNote cache'leri temizlenir.
 - Service worker yalnızca HTTP/HTTPS üzerinde kaydolur. Bu nedenle `dist/index.html` dosyasını doğrudan `file://` ile açma desteği korunur.
